@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#FBF9F4">
+<title>Dashboard Mensal — Clínica Isabella Eleutério</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#FBF9F4; --card:#FFFFFF; --line:rgba(33,31,54,.10); --fill:rgba(33,31,54,.05);
+  --ink:#211F36; --ink2:rgba(33,31,54,.62); --ink3:rgba(33,31,54,.34);
+  --violet:#5B4FE0; --violet-deep:#4038B0; --violet-bg:#EEEBFC;
+  --gold:#B8862E; --gold-bg:#FBF0DA;
+  --mint:#1FAE7C; --mint-bg:#E4F6EE;
+  --amber:#F0932B; --amber-bg:#FDEEDC;
+  --coral:#E2483A; --coral-bg:#FBE7E5;
+  --df: 'Fraunces', Georgia, serif; --sf: 'Manrope', -apple-system, sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:var(--sf);background:var(--paper);color:var(--ink);min-height:100vh;
+  padding:calc(env(safe-area-inset-top) + 18px) 0 60px}
+.wrap{max-width:720px;margin:0 auto;padding:0 18px}
+
+.topnav{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap}
+.topnav a{font-family:var(--sf);font-size:12.5px;font-weight:700;color:var(--ink2);background:var(--fill);
+  border-radius:999px;padding:8px 14px;text-decoration:none;transition:background .15s,color .15s}
+.topnav a.ativo{background:var(--violet);color:#fff}
+.topnav a:hover{background:var(--violet-bg);color:var(--violet-deep)}
+.topnav a.ativo:hover{background:var(--violet);color:#fff}
+
+.greeting{font-size:13px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.6px}
+.nome{font-family:var(--df);font-size:32px;font-weight:600;line-height:1.05;margin:2px 0 4px;letter-spacing:-.5px}
+.subtitulo{font-size:14px;color:var(--ink2);margin-bottom:22px}
+
+.section{font-family:var(--sf);font-size:12.5px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;
+  color:var(--ink3);margin:28px 4px 10px}
+.card{background:var(--card);border-radius:22px;border:1px solid var(--line);box-shadow:0 1px 2px rgba(33,31,54,.03)}
+
+/* ---- tiras de estatística (visão geral) ---- */
+.statgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:1px;background:var(--line);
+  border-radius:22px;overflow:hidden;border:1px solid var(--line)}
+.statgrid .cel{background:var(--card);padding:16px 14px;text-align:center}
+.statgrid .lbl{font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.4px}
+.statgrid .v{font-family:var(--df);font-size:20px;font-weight:600;margin-top:6px}
+.statgrid .v.gold{color:var(--gold)}
+.statgrid .v.violet{color:var(--violet)}
+
+/* ---- cards de pessoa ---- */
+.pessoas-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px}
+.pessoa-card{background:var(--card);border-radius:20px;border:1px solid var(--line);
+  box-shadow:0 1px 2px rgba(33,31,54,.03);padding:18px}
+.pessoa-topo{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.pessoa-nome{font-family:var(--df);font-size:19px;font-weight:600}
+.status-pill{font-size:16px;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;flex-shrink:0}
+
+.barra-track{width:100%;height:8px;border-radius:999px;background:var(--fill);overflow:hidden;margin-bottom:14px}
+.barra-fill{height:100%;border-radius:999px;transition:width .6s cubic-bezier(.16,1,.3,1)}
+
+.pessoa-numeros{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.num-bloco{text-align:center}
+.num-lbl{display:block;font-size:10.5px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.3px}
+.num-v{display:block;font-family:var(--df);font-size:17px;font-weight:600;margin-top:3px}
+
+.pessoa-bonus{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding-top:12px;
+  border-top:1px dashed var(--line);margin-bottom:10px}
+.num-v.gold{color:var(--gold)}
+
+.pessoa-faltas{font-size:12.5px;font-weight:700;color:var(--coral);background:var(--coral-bg);
+  border-radius:10px;padding:8px 10px;margin-bottom:10px}
+
+.pessoa-msg{font-size:13px;font-weight:600;line-height:1.4;padding-top:10px;border-top:1px solid var(--line)}
+
+.footer{text-align:center;font-size:11.5px;color:var(--ink3);margin-top:26px;line-height:1.6}
+.loading,.errbox{text-align:center;padding:60px 20px;color:var(--ink2);font-size:15px;line-height:1.6}
+.errbox{color:var(--coral)}
+.errbox a{color:var(--violet);font-weight:700}
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <div class="loading">Carregando o mês…</div>
+</div>
+
+<script>
+/* ============ CONFIG ============ */
+const SHEET_ID = '1kFVP2oocRi0zsofaK9BihRbnpCo_nyM0R28wARnQu1A';
+const TAB = '2_Dashboard_Mensal';
+
+/* ============ HELPERS DE TEXTO ============ */
+function norm(s){ return String(s??'').trim().toLowerCase(); }
+
+/* ============ FETCH ============
+   Igual ao das outras páginas: fetch() direto no gviz. Só funciona fora do
+   preview de artifact do Claude (hospedado, ex: GitHub Pages). */
+async function buscarAba(tab){
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(tab)}`;
+  const res = await fetch(url);
+  const raw = await res.text();
+  const jsonText = raw.substring(raw.indexOf('{'), raw.lastIndexOf('}')+1);
+  const data = JSON.parse(jsonText);
+  if(data.status==='error') throw new Error(JSON.stringify(data.errors));
+  return data.table;
+}
+
+/* ============ ACHAR CABEÇALHO (mesma lógica da página individual) ============
+   O Google às vezes detecta sozinho uma linha como cabeçalho e já tira ela de
+   "rows" (o texto vira table.cols[].label); outras vezes o cabeçalho continua
+   sendo uma linha normal dentro de "rows". Cobrimos os dois casos, ancorando
+   por um rótulo que sabemos que existe (ex: "Pessoa"). */
+function acharCabecalho(table, rotuloAncora){
+  const alvo = norm(rotuloAncora);
+  const rows = table.rows, C = table.cols.length;
+  const val=(r,c)=>{const x=rows[r]&&rows[r].c[c];return x?(x.f??x.v??''):''};
+  const colLabelsNorm = table.cols.map(c => norm(c.label));
+  let colAncora = colLabelsNorm.findIndex(l => l===alvo);
+
+  const headerMap = {};
+  if(colAncora>=0){
+    for(let c=colAncora;c<C;c++){ if(colLabelsNorm[c]) headerMap[colLabelsNorm[c]]=c; }
+    return {headerMap, dataStartRow:0, colAncora};
+  }
+  let headerRow=-1;
+  const limite = Math.min(rows.length,40);
+  for(let r=0;r<limite;r++){
+    for(let c=0;c<C;c++){ if(norm(val(r,c))===alvo){ headerRow=r; colAncora=c; break; } }
+    if(headerRow>=0) break;
+  }
+  if(headerRow<0) return null;
+  for(let c=colAncora;c<C;c++){ const t=norm(val(headerRow,c)); if(t) headerMap[t]=c; }
+  return {headerMap, dataStartRow:headerRow+1, colAncora};
+}
+
+/* Acha o valor que vem "depois" de um rótulo solto na planilha (usado pra ler
+   a tira "Visão Geral": Mês, % decorrido, Faturamento meta...). Cobre 3 casos:
+   1) o rótulo virou table.cols[].label E o valor ao lado também virou label
+      de uma coluna seguinte (a linha toda foi promovida a cabeçalho);
+   2) o rótulo virou table.cols[].label mas o valor ficou numa linha normal;
+   3) nem rótulo nem valor viraram cabeçalho — os dois são texto normal
+      dentro de "rows", na mesma linha, colunas vizinhas. */
+function buscarValorPorRotulo(table, rotulo){
+  const alvo = norm(rotulo);
+  const rows = table.rows, C = table.cols.length;
+  const val=(r,c)=>{const x=rows[r]&&rows[r].c[c];return x?(x.f??x.v??''):''};
+  const colLabelsNorm = table.cols.map(c => norm(c.label));
+  const idxCol = colLabelsNorm.findIndex(l => l===alvo);
+
+  if(idxCol>=0){
+    for(let c=idxCol+1;c<C;c++){
+      const labelVizinho = table.cols[c].label;
+      if(labelVizinho && String(labelVizinho).trim()!=='') return labelVizinho;
+    }
+    for(let r=0;r<rows.length;r++){
+      for(let c=idxCol+1;c<C;c++){ const v=val(r,c); if(v!=='') return v; }
+    }
+  }
+  for(let r=0;r<rows.length;r++){
+    for(let c=0;c<C;c++){
+      if(norm(val(r,c))===alvo){
+        for(let c2=c+1;c2<C;c2++){ const v2=val(r,c2); if(v2!=='') return v2; }
+      }
+    }
+  }
+  return null;
+}
+
+function montarDump(table){
+  const rows = table.rows, C = table.cols.length;
+  const val=(r,c)=>{const x=rows[r]&&rows[r].c[c];return x?(x.f??x.v??''):''};
+  const dump = [];
+  dump.push('--- table.cols (rótulos de coluna crus) ---');
+  table.cols.forEach((c,i)=>{ dump.push(`col ${i}: id="${c.id}" label=${JSON.stringify(c.label)} type=${c.type}`); });
+  dump.push('');
+  dump.push('--- primeiras linhas de table.rows ---');
+  for(let r=0;r<Math.min(rows.length,25);r++){
+    const linha = [];
+    for(let c=0;c<Math.min(C,14);c++) linha.push(val(r,c) || '·');
+    dump.push(`L${r}: ${linha.join(' | ')}`);
+  }
+  return dump.join('\n');
+}
+
+/* ============ PARSER ESPECÍFICO DO DASHBOARD MENSAL ============ */
+function parseMensal(table){
+  const rows = table.rows, C = table.cols.length;
+  const cell=(r,c)=>(rows[r]&&rows[r].c[c])?rows[r].c[c]:null;
+  const val=(r,c)=>{const x=cell(r,c);return x?(x.f??x.v??''):''};
+  const rawnum=(r,c)=>{const x=cell(r,c);if(!x)return null;const n=typeof x.v==='number'?x.v:parseFloat(String(x.v).replace(',','.'));return isNaN(n)?null:n};
+
+  const cab = acharCabecalho(table, 'pessoa');
+  if(!cab){
+    const err = new Error('Cabeçalho "Pessoa" não encontrado nessa aba (nem nos títulos das colunas, nem no conteúdo)');
+    err.dump = montarDump(table);
+    throw err;
+  }
+  const {headerMap, dataStartRow} = cab;
+  const colPessoa = headerMap['pessoa'];
+  const colMeta=headerMap['meta mês'], colReal=headerMap['realizado'], colPct=headerMap['% atingido'],
+        colProj=headerMap['projeção'], colPctProj=headerMap['% projeção'], colStatus=headerMap['status'],
+        colBonusApurado=headerMap['bônus apurado'], colFaltas=headerMap['faltas'], colPenalidade=headerMap['penalidade'],
+        colASerPago=headerMap['a ser pago'], colBonusMax=headerMap['bônus máximo'], colMsg=headerMap['mensagem'];
+
+  const pessoas = [];
+  let totalASerPago = null;
+  for(let r=dataStartRow;r<rows.length;r++){
+    const nome = val(r,colPessoa);
+    if(nome===''||nome==null) break;
+    if(norm(nome)==='total'){
+      totalASerPago = colASerPago!=null ? val(r,colASerPago) : null;
+      continue;
+    }
+    pessoas.push({
+      nome,
+      meta: val(r,colMeta), realizado: val(r,colReal),
+      pct: colPct!=null ? val(r,colPct) : null, pctNum: colPct!=null ? rawnum(r,colPct) : null,
+      projecao: val(r,colProj), pctProjecao: colPctProj!=null?val(r,colPctProj):null,
+      status: colStatus!=null ? val(r,colStatus) : '',
+      bonusApurado: colBonusApurado!=null?val(r,colBonusApurado):null,
+      faltas: colFaltas!=null?rawnum(r,colFaltas):null,
+      penalidade: colPenalidade!=null?val(r,colPenalidade):null,
+      aSerPago: colASerPago!=null?val(r,colASerPago):null,
+      bonusMax: colBonusMax!=null?val(r,colBonusMax):null,
+      mensagem: colMsg!=null?val(r,colMsg):''
+    });
+  }
+
+  const visaoGeral = {
+    mes: buscarValorPorRotulo(table, 'mês'),
+    pctDecorrido: buscarValorPorRotulo(table, '% decorrido'),
+    faturamentoMeta: buscarValorPorRotulo(table, 'faturamento meta'),
+    bonusTotalPossivel: buscarValorPorRotulo(table, 'bônus total possível'),
+    totalApurado: buscarValorPorRotulo(table, 'total apurado'),
+    totalASerPago
+  };
+
+  return {visaoGeral, pessoas};
+}
+
+/* ============ STATUS (cor a partir do emoji) ============ */
+function statusDe(status){
+  if((status||'').includes('🟢')) return {cor:'mint', bg:'var(--mint-bg)', ink:'var(--mint)', hex:'#1FAE7C'};
+  if((status||'').includes('🔴')) return {cor:'coral', bg:'var(--coral-bg)', ink:'var(--coral)', hex:'#E2483A'};
+  return {cor:'amber', bg:'var(--amber-bg)', ink:'var(--amber)', hex:'#F0932B'};
+}
+
+/* ============ RENDER ============ */
+function render(dados){
+  const {visaoGeral, pessoas} = dados;
+  const app = document.getElementById('app');
+
+  app.innerHTML = `
+    <nav class="topnav">
+      <a href="metas-index.html">Individual</a>
+      <a href="dashboard-mensal.html" class="ativo">Mensal</a>
+      <a href="dashboard-semanal.html">Semanal</a>
+    </nav>
+
+    <div class="greeting">Visão da gestão</div>
+    <div class="nome">Dashboard Mensal</div>
+    <div class="subtitulo">${visaoGeral.mes ? 'Referente a ' + visaoGeral.mes : 'Foto consolidada do mês'}${visaoGeral.pctDecorrido ? ' · ' + visaoGeral.pctDecorrido + ' do mês decorrido' : ''}</div>
+
+    <div class="statgrid">
+      <div class="cel"><div class="lbl">Faturamento meta</div><div class="v">${visaoGeral.faturamentoMeta ?? '—'}</div></div>
+      <div class="cel"><div class="lbl">Bônus total possível</div><div class="v gold">${visaoGeral.bonusTotalPossivel ?? '—'}</div></div>
+      <div class="cel"><div class="lbl">Total apurado</div><div class="v violet">${visaoGeral.totalApurado ?? '—'}</div></div>
+      <div class="cel"><div class="lbl">Total a pagar</div><div class="v gold">${visaoGeral.totalASerPago ?? '—'}</div></div>
+    </div>
+
+    <div class="section">Resultado por pessoa</div>
+    <div class="pessoas-grid">
+      ${pessoas.map(p=>{
+        const st = statusDe(p.status);
+        const pct = p.pctNum!=null ? Math.max(0,Math.min(p.pctNum,1))*100 : 0;
+        return `
+        <div class="pessoa-card">
+          <div class="pessoa-topo">
+            <div class="pessoa-nome">${p.nome}</div>
+            <div class="status-pill" style="background:${st.bg}">${p.status||''}</div>
+          </div>
+          <div class="barra-track"><div class="barra-fill" style="width:${pct}%;background:${st.hex}"></div></div>
+          <div class="pessoa-numeros">
+            <div class="num-bloco"><span class="num-lbl">Meta</span><span class="num-v">${p.meta ?? '—'}</span></div>
+            <div class="num-bloco"><span class="num-lbl">Realizado</span><span class="num-v">${p.realizado ?? '—'}</span></div>
+            <div class="num-bloco"><span class="num-lbl">Projeção</span><span class="num-v">${p.projecao ?? '—'}</span></div>
+          </div>
+          <div class="pessoa-bonus">
+            <div class="num-bloco"><span class="num-lbl">Apurado</span><span class="num-v gold">${p.bonusApurado ?? '—'}</span></div>
+            <div class="num-bloco"><span class="num-lbl">A pagar</span><span class="num-v gold">${p.aSerPago || 'R$ 0'}</span></div>
+            <div class="num-bloco"><span class="num-lbl">Máximo</span><span class="num-v">${p.bonusMax ?? '—'}</span></div>
+          </div>
+          ${p.faltas ? `<div class="pessoa-faltas">⚠️ ${p.faltas} falta(s) no mês — desconto de ${p.penalidade||'—'}</div>` : ''}
+          ${p.mensagem ? `<div class="pessoa-msg" style="color:${st.ink}">${p.mensagem}</div>` : ''}
+        </div>`;
+      }).join('')}
+    </div>
+
+    <div class="footer">Dados direto da planilha · "A pagar" já considera o desconto de faltas (se houver)</div>
+  `;
+}
+
+/* ============ CARREGAR ============ */
+async function carregar(){
+  const app = document.getElementById('app');
+  app.innerHTML = '<div class="loading">Carregando o mês…</div>';
+  try{
+    const table = await buscarAba(TAB);
+    const dados = parseMensal(table);
+    render(dados);
+  }catch(e){
+    const dentroDeIframe = (function(){ try{ return window.self !== window.top; }catch(_){ return true; } })();
+    const dicaSandbox = dentroDeIframe
+      ? `<br><br><b>Isso é esperado dentro do preview do Claude:</b> por segurança, o Claude bloqueia chamadas de rede externas de dentro do artifact. Essa tela só vai puxar dados de verdade fora daqui — publicada (ex: GitHub Pages).`
+      : '';
+    const urlBruta = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(TAB)}`;
+    const linkBruto = `<br><br><a href="${urlBruta}" target="_blank">abrir resposta crua da planilha (aba ${TAB})</a>`;
+    app.innerHTML = `<div class="errbox">Não consegui ler o Dashboard Mensal.<br><br>${e.message}${dicaSandbox}${linkBruto}<br><br>${
+      e.dump
+        ? `Conteúdo cru (manda um print disso):<br><pre style="text-align:left;white-space:pre-wrap;font-size:10px;background:var(--fill);padding:10px;border-radius:10px;margin-top:8px">${e.dump}</pre>`
+        : ''
+    }</div>`;
+  }
+}
+
+carregar();
+</script>
+</body>
+</html>

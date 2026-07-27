@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#FBF9F4">
+<title>Dashboard Semanal — Clínica Isabella Eleutério</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#FBF9F4; --card:#FFFFFF; --line:rgba(33,31,54,.10); --fill:rgba(33,31,54,.05);
+  --ink:#211F36; --ink2:rgba(33,31,54,.62); --ink3:rgba(33,31,54,.34);
+  --violet:#5B4FE0; --violet-deep:#4038B0; --violet-bg:#EEEBFC;
+  --gold:#B8862E; --gold-bg:#FBF0DA;
+  --mint:#1FAE7C; --mint-bg:#E4F6EE;
+  --amber:#F0932B; --amber-bg:#FDEEDC;
+  --coral:#E2483A; --coral-bg:#FBE7E5;
+  --df: 'Fraunces', Georgia, serif; --sf: 'Manrope', -apple-system, sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:var(--sf);background:var(--paper);color:var(--ink);min-height:100vh;
+  padding:calc(env(safe-area-inset-top) + 18px) 0 60px}
+.wrap{max-width:980px;margin:0 auto;padding:0 18px}
+
+.topnav{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap}
+.topnav a{font-family:var(--sf);font-size:12.5px;font-weight:700;color:var(--ink2);background:var(--fill);
+  border-radius:999px;padding:8px 14px;text-decoration:none;transition:background .15s,color .15s}
+.topnav a.ativo{background:var(--violet);color:#fff}
+.topnav a:hover{background:var(--violet-bg);color:var(--violet-deep)}
+.topnav a.ativo:hover{background:var(--violet);color:#fff}
+
+.greeting{font-size:13px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.6px}
+.nome{font-family:var(--df);font-size:32px;font-weight:600;line-height:1.05;margin:2px 0 4px;letter-spacing:-.5px}
+.subtitulo{font-size:14px;color:var(--ink2);margin-bottom:22px}
+
+.tabela-card{background:var(--card);border-radius:20px;border:1px solid var(--line);
+  box-shadow:0 1px 2px rgba(33,31,54,.03);overflow:auto}
+table{border-collapse:collapse;width:100%;min-width:760px;font-size:13.5px}
+thead th{position:sticky;top:0;background:var(--card);font-family:var(--sf);font-size:11px;font-weight:800;
+  text-transform:uppercase;letter-spacing:.4px;color:var(--ink3);padding:14px 10px;text-align:center;
+  border-bottom:1px solid var(--line)}
+thead th.nome-col{text-align:left;padding-left:18px}
+thead th.total-col{color:var(--violet)}
+tbody td{padding:12px 10px;text-align:center;border-bottom:1px solid var(--line);vertical-align:middle}
+tbody tr:last-child td{border-bottom:none}
+td.nome-col{text-align:left;font-family:var(--df);font-weight:600;font-size:15px;padding-left:18px;white-space:nowrap}
+td.semana-cel{border-radius:12px}
+.semana-real{font-family:var(--df);font-weight:600;font-size:15px}
+.semana-meta{display:block;font-size:10.5px;color:var(--ink3);margin-top:1px}
+.semana-pct{display:block;font-size:10px;font-weight:700;margin-top:2px}
+td.total-cel{font-weight:700}
+.total-real{font-family:var(--df);font-weight:700;font-size:16px}
+.total-meta{display:block;font-size:10.5px;color:var(--ink3);margin-top:1px}
+.total-status{font-size:15px;margin-left:4px}
+
+.legenda{display:flex;gap:16px;flex-wrap:wrap;margin-top:14px;padding:0 4px}
+.legenda-item{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--ink2)}
+.legenda-dot{width:10px;height:10px;border-radius:50%}
+
+.footer{text-align:center;font-size:11.5px;color:var(--ink3);margin-top:20px;line-height:1.6}
+.loading,.errbox{text-align:center;padding:60px 20px;color:var(--ink2);font-size:15px;line-height:1.6}
+.errbox{color:var(--coral)}
+.errbox a{color:var(--violet);font-weight:700}
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <div class="loading">Carregando as semanas…</div>
+</div>
+
+<script>
+/* ============ CONFIG ============ */
+const SHEET_ID = '1kFVP2oocRi0zsofaK9BihRbnpCo_nyM0R28wARnQu1A';
+const TAB = '3_Dashboard_Semanal';
+
+function norm(s){ return String(s??'').trim().toLowerCase(); }
+
+async function buscarAba(tab){
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(tab)}`;
+  const res = await fetch(url);
+  const raw = await res.text();
+  const jsonText = raw.substring(raw.indexOf('{'), raw.lastIndexOf('}')+1);
+  const data = JSON.parse(jsonText);
+  if(data.status==='error') throw new Error(JSON.stringify(data.errors));
+  return data.table;
+}
+
+/* Acha a linha/coluna de cabeçalho ancorando por "Pessoa" — cobre tanto o
+   caso do Google auto-detectar cabeçalho (vira table.cols[].label) quanto o
+   caso dele continuar como linha normal dentro de "rows". Essa aba tem
+   cabeçalho em 2 níveis (linha "SEMANA 1/2/3..." + linha "Meta/Real/%" logo
+   abaixo), então depois de achar "Pessoa" ainda pulamos linhas de sub-
+   cabeçalho até achar a 1ª linha que já é dado de verdade. */
+function acharAncoraPessoa(table){
+  const rows = table.rows, C = table.cols.length;
+  const val=(r,c)=>{const x=rows[r]&&rows[r].c[c];return x?(x.f??x.v??''):''};
+  const colLabelsNorm = table.cols.map(c => norm(c.label));
+  const tokensSubCabecalho = ['meta','real','realizado','%','projeção','projecao','status'];
+
+  function primeiraLinhaDeDado(colPessoa, r0){
+    let r = r0;
+    const limite = Math.min(rows.length, r0+5);
+    while(r < limite){
+      const v = norm(val(r, colPessoa+1));
+      if(tokensSubCabecalho.includes(v)){ r++; continue; }
+      break;
+    }
+    return r;
+  }
+
+  const colPessoaAuto = colLabelsNorm.findIndex(l => l==='pessoa');
+  if(colPessoaAuto>=0){
+    return {colPessoa:colPessoaAuto, dataStartRow: primeiraLinhaDeDado(colPessoaAuto, 0)};
+  }
+
+  const limite = Math.min(rows.length,40);
+  for(let r=0;r<limite;r++){
+    for(let c=0;c<C;c++){
+      if(norm(val(r,c))==='pessoa'){
+        return {colPessoa:c, dataStartRow: primeiraLinhaDeDado(c, r+1)};
+      }
+    }
+  }
+  return null;
+}
+
+function montarDump(table){
+  const rows = table.rows, C = table.cols.length;
+  const val=(r,c)=>{const x=rows[r]&&rows[r].c[c];return x?(x.f??x.v??''):''};
+  const dump = [];
+  dump.push('--- table.cols (rótulos de coluna crus) ---');
+  table.cols.forEach((c,i)=>{ dump.push(`col ${i}: id="${c.id}" label=${JSON.stringify(c.label)} type=${c.type}`); });
+  dump.push('');
+  dump.push('--- primeiras linhas de table.rows ---');
+  for(let r=0;r<Math.min(rows.length,25);r++){
+    const linha = [];
+    for(let c=0;c<Math.min(C,20);c++) linha.push(val(r,c) || '·');
+    dump.push(`L${r}: ${linha.join(' | ')}`);
+  }
+  return dump.join('\n');
+}
+
+/* ============ PARSER ============
+   Estrutura fixa da planilha: depois da coluna "Pessoa" vêm 5 grupos de 3
+   colunas (Meta/Real/%) — uma por semana — e por fim mais 3 colunas
+   (Meta/Projeção/Status) com o total do mês. Isso não depende de conseguir
+   ler o cabeçalho de 2 níveis (linha "SEMANA 1/2/3..." mesclada por cima),
+   só da posição relativa à coluna "Pessoa". */
+function parseSemanal(table){
+  const rows = table.rows;
+  const cell=(r,c)=>(rows[r]&&rows[r].c[c])?rows[r].c[c]:null;
+  const val=(r,c)=>{const x=cell(r,c);return x?(x.f??x.v??''):''};
+  const rawnum=(r,c)=>{const x=cell(r,c);if(!x)return null;const n=typeof x.v==='number'?x.v:parseFloat(String(x.v).replace(',','.'));return isNaN(n)?null:n};
+
+  const ancora = acharAncoraPessoa(table);
+  if(!ancora){
+    const err = new Error('Cabeçalho "Pessoa" não encontrado nessa aba (nem nos títulos das colunas, nem no conteúdo)');
+    err.dump = montarDump(table);
+    throw err;
+  }
+  const {colPessoa, dataStartRow} = ancora;
+
+  const pessoas = [];
+  for(let r=dataStartRow;r<rows.length;r++){
+    const nome = val(r,colPessoa);
+    if(nome===''||nome==null) break;
+    if(norm(nome)==='total') continue;
+
+    const semanas = [];
+    for(let s=0;s<5;s++){
+      const cMeta = colPessoa+1+s*3, cReal=cMeta+1, cPct=cMeta+2;
+      semanas.push({
+        meta: val(r,cMeta), real: val(r,cReal), pct: val(r,cPct),
+        pctNum: rawnum(r,cPct)
+      });
+    }
+    const cMetaTotal = colPessoa+16, cProjTotal = colPessoa+17, cStatusTotal = colPessoa+18;
+    pessoas.push({
+      nome, semanas,
+      total: { meta: val(r,cMetaTotal), projecao: val(r,cProjTotal), status: val(r,cStatusTotal) }
+    });
+  }
+  return pessoas;
+}
+
+/* ============ COR por % (só informativo — semanas futuras naturalmente têm % baixo) ============ */
+function corPct(pctNum){
+  if(pctNum==null) return {bg:'var(--fill)', ink:'var(--ink2)'};
+  if(pctNum>=1) return {bg:'var(--mint-bg)', ink:'var(--mint)'};
+  if(pctNum>=0.7) return {bg:'var(--amber-bg)', ink:'var(--amber)'};
+  return {bg:'var(--coral-bg)', ink:'var(--coral)'};
+}
+
+/* ============ RENDER ============ */
+function render(pessoas){
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <nav class="topnav">
+      <a href="metas-index.html">Individual</a>
+      <a href="dashboard-mensal.html">Mensal</a>
+      <a href="dashboard-semanal.html" class="ativo">Semanal</a>
+    </nav>
+
+    <div class="greeting">Visão da gestão</div>
+    <div class="nome">Dashboard Semanal</div>
+    <div class="subtitulo">Meta e realizado por semana, pessoa a pessoa</div>
+
+    <div class="tabela-card">
+      <table>
+        <thead>
+          <tr>
+            <th class="nome-col">Pessoa</th>
+            <th>Semana 1</th><th>Semana 2</th><th>Semana 3</th><th>Semana 4</th><th>Semana 5</th>
+            <th class="total-col">Total do mês</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${pessoas.map(p=>{
+            const semanasHtml = p.semanas.map(s=>{
+              const c = corPct(s.pctNum);
+              return `<td class="semana-cel" style="background:${c.bg}">
+                <span class="semana-real" style="color:${c.ink}">${s.real || 0}</span>
+                <span class="semana-meta">meta ${s.meta ?? '—'}</span>
+                <span class="semana-pct" style="color:${c.ink}">${s.pct ?? ''}</span>
+              </td>`;
+            }).join('');
+            return `<tr>
+              <td class="nome-col">${p.nome}</td>
+              ${semanasHtml}
+              <td class="total-cel">
+                <span class="total-real">${p.total.projecao ?? '—'}</span><span class="total-status">${p.total.status||''}</span>
+                <span class="total-meta">meta ${p.total.meta ?? '—'}</span>
+              </td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="legenda">
+      <div class="legenda-item"><span class="legenda-dot" style="background:var(--mint)"></span>Meta batida (≥100%)</div>
+      <div class="legenda-item"><span class="legenda-dot" style="background:var(--amber)"></span>Perto (70–99%)</div>
+      <div class="legenda-item"><span class="legenda-dot" style="background:var(--coral)"></span>Abaixo (&lt;70%)</div>
+    </div>
+
+    <div class="footer">Semanas futuras aparecem com % baixo naturalmente — ainda não deu tempo de realizar. A coluna final usa a projeção (no ritmo atual) como número principal.</div>
+  `;
+}
+
+/* ============ CARREGAR ============ */
+async function carregar(){
+  const app = document.getElementById('app');
+  app.innerHTML = '<div class="loading">Carregando as semanas…</div>';
+  try{
+    const table = await buscarAba(TAB);
+    const pessoas = parseSemanal(table);
+    render(pessoas);
+  }catch(e){
+    const dentroDeIframe = (function(){ try{ return window.self !== window.top; }catch(_){ return true; } })();
+    const dicaSandbox = dentroDeIframe
+      ? `<br><br><b>Isso é esperado dentro do preview do Claude:</b> por segurança, o Claude bloqueia chamadas de rede externas de dentro do artifact. Essa tela só vai puxar dados de verdade fora daqui — publicada (ex: GitHub Pages).`
+      : '';
+    const urlBruta = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(TAB)}`;
+    const linkBruto = `<br><br><a href="${urlBruta}" target="_blank">abrir resposta crua da planilha (aba ${TAB})</a>`;
+    app.innerHTML = `<div class="errbox">Não consegui ler o Dashboard Semanal.<br><br>${e.message}${dicaSandbox}${linkBruto}<br><br>${
+      e.dump
+        ? `Conteúdo cru (manda um print disso):<br><pre style="text-align:left;white-space:pre-wrap;font-size:10px;background:var(--fill);padding:10px;border-radius:10px;margin-top:8px">${e.dump}</pre>`
+        : ''
+    }</div>`;
+  }
+}
+
+carregar();
+</script>
+</body>
+</html>
