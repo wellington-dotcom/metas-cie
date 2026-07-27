@@ -142,6 +142,42 @@ async function buscarAba(tab){
   if(data.status==='error') throw new Error(JSON.stringify(data.errors));
   return data.table;
 }
+
+/* Bônus já GANHO de verdade (com desconto de falta já aplicado) vem do
+   Dashboard Mensal, coluna "Bônus apurado" — não confundir com o "Subtotal
+   base" da aba individual, que soma o valor ALVO de cada semana mesmo pras
+   que ainda não terminaram (a planilha só conta o bônus quando a semana
+   encerra). Falha graciosamente: se der errado, devolve null e a tela
+   principal continua funcionando normalmente. */
+async function buscarBonusApurado(nomePessoa){
+  try{
+    const table = await buscarAba('2_Dashboard_Mensal');
+    const rows = table.rows, C = table.cols.length;
+    const cell=(r,c)=>(rows[r]&&rows[r].c[c])?rows[r].c[c]:null;
+    const val=(r,c)=>{const x=cell(r,c);return x?(x.f??x.v??''):''};
+    const colLabelsNorm = table.cols.map(c=>norm(c.label));
+    let colPessoa = colLabelsNorm.findIndex(l=>l==='pessoa');
+    const headerMap={}; let dataStartRow=0;
+    if(colPessoa>=0){
+      for(let c=0;c<C;c++){ if(colLabelsNorm[c]) headerMap[colLabelsNorm[c]]=c; }
+    }else{
+      let headerRow=-1;
+      const limite=Math.min(rows.length,40);
+      for(let r=0;r<limite;r++){for(let c=0;c<C;c++){if(norm(val(r,c))==='pessoa'){headerRow=r;colPessoa=c;break}}if(headerRow>=0)break}
+      if(headerRow<0) return null;
+      for(let c=colPessoa;c<C;c++){const t=norm(val(headerRow,c));if(t)headerMap[t]=c}
+      dataStartRow=headerRow+1;
+    }
+    const colBonusApurado = headerMap['bônus apurado'];
+    if(colBonusApurado==null) return null;
+    for(let r=dataStartRow;r<rows.length;r++){
+      const nome = val(r,colPessoa);
+      if(nome===''||nome==null) break;
+      if(norm(nome)===norm(nomePessoa)) return val(r,colBonusApurado);
+    }
+    return null;
+  }catch(e){ return null; }
+}
 function statusDe(mensagem){
   if((mensagem||'').includes('🟢')) return {cor:'emerald', hex:'#10b981', bg:'#d1fae5', ink:'#047857'};
   if((mensagem||'').includes('🔴')) return {cor:'red', hex:'#ef4444', bg:'#fee2e2', ink:'#b91c1c'};
@@ -163,6 +199,23 @@ function parseDataBR(s){
   return new Date(ano, m-1, d);
 }
 function diasNoMes(date){ return new Date(date.getFullYear(), date.getMonth()+1, 0).getDate(); }
+function parseRealMeta(s){
+  if(!s) return null;
+  const partes = String(s).split('/').map(x=>parseFloat(String(x).trim().replace(',','.')));
+  if(partes.length!==2 || isNaN(partes[0]) || isNaN(partes[1])) return null;
+  return {real:partes[0], meta:partes[1]};
+}
+/* acha o dia de "hoje" comparando a data real do calendário com as datas da
+   planilha — não pode assumir que a última linha é hoje, porque a planilha
+   já vem preenchida (com zero) até o fim do mês inteiro. */
+function acharHoje(dias, agora){
+  agora = agora || new Date();
+  const achado = dias.find(d=>{
+    const dt = parseDataBR(d.data);
+    return dt && dt.getDate()===agora.getDate() && dt.getMonth()===agora.getMonth() && dt.getFullYear()===agora.getFullYear();
+  });
+  return achado || dias[dias.length-1] || null;
+}
 
 function svgRing(pct, corHex, size=64, stroke=6){
   const r = (size/2)-stroke;
@@ -180,16 +233,16 @@ const ICONE_CHECK = `<svg class="w-5 h-5" fill="none" stroke="currentColor" view
 const ICONE_ANDAMENTO = `<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M13.492 10.39c-1.381 0-2.5 1.119-2.5 2.5s1.119 2.5 2.5 2.5 2.5-1.119 2.5-2.5-1.119-2.5-2.5-2.5zm.008 4c-.827 0-1.5-.673-1.5-1.5s.673-1.5 1.5-1.5 1.5.673 1.5 1.5-.673 1.5-1.5 1.5z"/><path d="M19.03 12c0-3.059-2.471-5.53-5.53-5.53s-5.53 2.471-5.53 5.53c0 1.488.587 2.84 1.543 3.844l-1.493 1.493C6.772 16.035 6 14.108 6 12c0-4.411 3.589-8 8-8s8 3.589 8 8c0 2.108-.772 4.035-2.02 5.337l-1.493-1.493c.956-1.004 1.543-2.356 1.543-3.844z"/></svg>`;
 const ICONE_CADEADO = `<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" clip-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"/></svg>`;
 
-const CORES_SEMANA_UNLOCKED = ['bg-violet-600','bg-emerald-500'];
+const ICONE_X = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" stroke-linecap="round" stroke-linejoin="round" stroke-width="3"/></svg>`;
 
 /* ================= RENDER ================= */
-function render(pessoa, parsed){
+function render(pessoa, parsed, bonusApurado){
   const {dias, resumo} = parsed;
   const st = statusDe(resumo.mensagem);
   const pctNum = resumo.metaMensal ? resumo.realizadoTotal/resumo.metaMensal : 0;
   const pctLabel = resumo.pctAtingido || Math.round(pctNum*100)+'%';
 
-  const hoje = dias[dias.length-1];
+  const hoje = acharHoje(dias);
   const hojeData = hoje ? parseDataBR(hoje.data) : null;
   const totalDiasMes = hojeData ? diasNoMes(hojeData) : null;
   const diasRestantes = (hoje && totalDiasMes) ? Math.max(0, totalDiasMes - hoje.dia) : null;
@@ -197,21 +250,25 @@ function render(pessoa, parsed){
 
   const semanaAtualNum = hoje ? hoje.semana : null;
 
-  // Jornada do bônus: status de cada semana (concluída / em andamento / travada)
+  // Jornada do bônus: status de cada semana (concluída batendo / concluída sem bater / em andamento / travada)
   const semanasOrdenadas = ['1','2','3','4','5'].filter(n=>resumo.semanas[n]);
-  const jornadaHtml = semanasOrdenadas.map((n,i)=>{
+  const jornadaHtml = semanasOrdenadas.map((n)=>{
     const s = resumo.semanas[n];
     const numSemana = parseInt(n,10);
     const concluida = semanaAtualNum!=null && numSemana < semanaAtualNum;
     const emAndamento = semanaAtualNum!=null && numSemana === semanaAtualNum;
     if(concluida){
-      const cor = CORES_SEMANA_UNLOCKED[i % CORES_SEMANA_UNLOCKED.length];
+      const rm = parseRealMeta(s.realMeta);
+      const bateu = rm ? rm.real >= rm.meta : true;
+      const cor = bateu ? 'bg-emerald-500' : 'bg-red-500';
+      const rotulo = bateu ? 'Concluída' : 'Não batida';
+      const icone = bateu ? ICONE_CHECK : ICONE_X;
       return `<div class="relative z-10 flex flex-col items-center w-1/5 px-1">
         <div class="${cor} rounded-2xl p-4 text-white text-center w-full shadow-lg mb-4">
           <p class="text-xs opacity-90 font-semibold">Semana ${n}</p>
-          <p class="text-[10px] opacity-75 mb-2">Concluída</p>
+          <p class="text-[10px] opacity-75 mb-2">${rotulo}</p>
           <div class="bg-white/90 rounded-full w-8 h-8 flex items-center justify-center mx-auto mb-3" style="color:inherit">
-            <span class="${cor.replace('bg-','text-')}">${ICONE_CHECK}</span>
+            <span class="${cor.replace('bg-','text-')}">${icone}</span>
           </div>
           <p class="text-xl font-bold">${s.bonus}</p>
           <hr class="border-white/30 my-2"/>
@@ -244,19 +301,28 @@ function render(pessoa, parsed){
   }).join('');
 
   // gráfico diário: barra por dia, cor por status daquele dia, linha pontilhada = meta do dia mais recente
-  const metaRef = hoje ? (hoje.metaDia||0) : 0;
-  const maxVal = Math.max(metaRef, ...dias.map(d=>d.realizado||0), 1);
-  const alturaPx = 220;
-  const metaLinhaPct = maxVal ? (metaRef/maxVal)*100 : 0;
-  const barrasHtml = dias.map(d=>{
-    const h = maxVal ? Math.max(2, Math.round(((d.realizado||0)/maxVal)*alturaPx)) : 2;
-    const isHoje = d===hoje;
-    let cor = 'bg-gray-200';
-    if(isHoje) cor='bg-violet-600';
-    else if(d.metaDia!=null){ cor = (d.realizado||0) >= d.metaDia ? 'bg-emerald-500' : 'bg-orange-400'; }
-    return `<div class="flex-1 flex flex-col items-center group min-w-[10px]">
-      <div class="w-2 md:w-3 ${cor} rounded-t-sm" style="height:${h}px" title="Dia ${d.dia}: ${d.realizado ?? 0}"></div>
-      <span class="mt-2 text-[9px] font-bold text-gray-400">${d.dia}</span>
+  const maxVal = Math.max(...dias.map(d=>d.realizado||0), ...dias.map(d=>d.metaDia||0), 1);
+  const alturaPx = 180;
+  const porSemana = {};
+  dias.forEach(d=>{ (porSemana[d.semana]=porSemana[d.semana]||[]).push(d); });
+  const semanasDoGrafico = Object.keys(porSemana).sort((a,b)=>a-b);
+  const barrasHtml = semanasDoGrafico.map(sem=>{
+    const barrasDaSemana = porSemana[sem].map(d=>{
+      const h = maxVal ? Math.max(2, Math.round(((d.realizado||0)/maxVal)*alturaPx)) : 2;
+      const isHoje = d===hoje;
+      let cor = 'bg-gray-200';
+      if(isHoje) cor='bg-violet-600';
+      else if(d.metaDia!=null){ cor = (d.realizado||0) >= d.metaDia ? 'bg-emerald-500' : 'bg-orange-400'; }
+      return `<div class="flex flex-col items-center">
+        <div class="relative" style="height:${alturaPx}px">
+          <div class="absolute bottom-0 w-2 md:w-3 ${cor} rounded-t-sm" style="height:${h}px" title="Dia ${d.dia}: ${d.realizado ?? 0} (meta: ${d.metaDia ?? '—'})"></div>
+        </div>
+        <span class="mt-1 text-[9px] font-bold text-gray-400">${d.dia}</span>
+      </div>`;
+    }).join('');
+    return `<div class="flex flex-col items-center gap-2 px-3 border-r border-gray-100 last:border-r-0 flex-shrink-0">
+      <div class="flex items-end gap-1">${barrasDaSemana}</div>
+      <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wide whitespace-nowrap">Semana ${sem}</span>
     </div>`;
   }).join('');
 
@@ -294,7 +360,8 @@ function render(pessoa, parsed){
       </div>
       <div class="soft-card p-6 flex flex-col items-center justify-center text-center">
         <h3 class="text-gray-700 font-bold text-lg">Bônus Acumulado</h3>
-        <p class="text-3xl font-extrabold text-gray-900 mt-1">${resumo.bonusBase ?? '—'}</p>
+        <p class="text-3xl font-extrabold text-gray-900 mt-1">${bonusApurado ?? '—'}</p>
+        <p class="text-[11px] text-gray-400 mt-1">já garantido (líquido de falta)</p>
       </div>
       <div class="soft-card p-6 flex flex-col items-center justify-center">
         <h3 class="text-gray-700 font-bold text-lg mb-1">Dias Restantes</h3>
@@ -323,15 +390,15 @@ function render(pessoa, parsed){
     </div>
 
     <div class="soft-card p-8">
-      <h2 class="text-center text-2xl font-bold text-gray-800 mb-8">Acompanhamento Diário</h2>
+      <h2 class="text-center text-2xl font-bold text-gray-800 mb-2">Acompanhamento Diário</h2>
+      <div class="flex justify-center gap-4 mb-6 text-[11px] font-semibold text-gray-500">
+        <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-emerald-500 inline-block"></span>Bateu a meta do dia</span>
+        <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-orange-400 inline-block"></span>Abaixo da meta</span>
+        <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-violet-600 inline-block"></span>Hoje</span>
+      </div>
       <div class="relative w-full overflow-x-auto no-scrollbar">
-        <div class="ml-2 min-w-[600px]">
-          <div class="relative border-b border-gray-200 flex items-end justify-between px-2 pb-2" style="height:${alturaPx+20}px">
-            <div class="absolute w-full border-t-2 border-dotted border-gray-800 z-20" style="bottom:${metaLinhaPct}%"></div>
-            <div class="absolute right-0 -translate-y-4 text-[10px] font-bold text-gray-800 bg-white/80 px-1" style="bottom:${metaLinhaPct}%">Meta Diária (${metaRef})</div>
-            ${barrasHtml}
-          </div>
-          <div class="text-center mt-3 text-[11px] font-bold text-gray-500 uppercase tracking-widest">Dias do mês</div>
+        <div class="flex items-start pb-2 border-b border-gray-200" style="min-width:min-content">
+          ${barrasHtml}
         </div>
       </div>
     </div>
@@ -353,7 +420,8 @@ async function carregar(tab){
   try{
     const table = await buscarAba(pessoa.tab);
     const parsed = parseAbaIndividual(table);
-    render(pessoa, parsed);
+    const bonusApurado = await buscarBonusApurado(pessoa.nome);
+    render(pessoa, parsed, bonusApurado);
   }catch(e){
     const urlBruta = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(pessoa.tab)}`;
     app.innerHTML = `<div class="soft-card p-8 text-red-600">
