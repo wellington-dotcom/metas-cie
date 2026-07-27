@@ -183,17 +183,37 @@ async function buscarBonusApurado(nomePessoa){
     const cell=(r,c)=>(rows[r]&&rows[r].c[c])?rows[r].c[c]:null;
     const val=(r,c)=>{const x=cell(r,c);return x?(x.f??x.v??''):''};
     const colLabelsNorm = table.cols.map(c=>norm(c.label));
-    let colPessoa = colLabelsNorm.findIndex(l=>l.includes('pessoa'));
-    const headerMap={}; let dataStartRow=0;
-    if(colPessoa>=0){
-      for(let c=0;c<C;c++){ if(colLabelsNorm[c]) headerMap[colLabelsNorm[c]]=c; }
-    }else{
-      let headerRow=-1;
+
+    /* acha a coluna "Pessoa" em 4 tentativas, da mais estrita pra mais larga:
+       1) rótulo de coluna EXATO "pessoa" (cabeçalho já promovido pelo Google)
+       2) célula EXATA "pessoa" numa linha normal
+       3) rótulo de coluna que CONTÉM "pessoa" (título grudado, ex.: "...Pessoa")
+       4) célula que CONTÉM "pessoa" numa linha normal
+       Nessa ordem porque "contém" sozinho pega até "Resultado por Pessoa"
+       (um título de seção, não o cabeçalho de verdade) — só usamos isso se
+       nada exato for encontrado antes. */
+    let colPessoa=-1, headerRow=-1;
+    colPessoa = colLabelsNorm.findIndex(l=>l==='pessoa');
+    if(colPessoa<0){
+      const limite=Math.min(rows.length,40);
+      for(let r=0;r<limite;r++){for(let c=0;c<C;c++){if(norm(val(r,c))==='pessoa'){headerRow=r;colPessoa=c;break}}if(headerRow>=0)break}
+    }
+    if(colPessoa<0){
+      colPessoa = colLabelsNorm.findIndex(l=>l.includes('pessoa'));
+    }
+    if(colPessoa<0){
       const limite=Math.min(rows.length,40);
       for(let r=0;r<limite;r++){for(let c=0;c<C;c++){if(norm(val(r,c)).includes('pessoa')){headerRow=r;colPessoa=c;break}}if(headerRow>=0)break}
-      if(headerRow<0) return {valor:null, erro:'coluna "Pessoa" não encontrada (nem em cols, nem em rows)'};
+    }
+    if(colPessoa<0) return {valor:null, erro:'coluna "Pessoa" não encontrada de nenhuma forma (exata ou aproximada)'};
+
+    const headerMap={};
+    let dataStartRow=0;
+    if(headerRow>=0){
       for(let c=colPessoa;c<C;c++){const t=norm(val(headerRow,c));if(t)headerMap[t]=c}
       dataStartRow=headerRow+1;
+    }else{
+      for(let c=0;c<C;c++){ if(colLabelsNorm[c]) headerMap[colLabelsNorm[c]]=c; }
     }
     let colBonusApurado = headerMap['bônus apurado'];
     if(colBonusApurado==null){
