@@ -53,38 +53,67 @@ function parseAbaIndividual(table){
   const cell=(r,c)=>(rows[r]&&rows[r].c[c])?rows[r].c[c]:null;
   const val=(r,c)=>{const x=cell(r,c);return x?(x.f??x.v??''):''};
   const rawnum=(r,c)=>{const x=cell(r,c);if(!x)return null;const n=typeof x.v==='number'?x.v:parseFloat(String(x.v).replace(',','.'));return isNaN(n)?null:n};
-  let headerRow=-1,colDia=-1;
-  const limiteBusca = Math.min(rows.length,30);
-  for(let r=0;r<limiteBusca;r++){for(let c=0;c<C;c++){if(norm(val(r,c))==='dia'){headerRow=r;colDia=c;break}}if(headerRow>=0)break}
-  if(headerRow<0){
-    const dump = [];
-    for(let r=0;r<Math.min(rows.length,20);r++){
-      const linha = [];
-      for(let c=0;c<Math.min(C,10);c++) linha.push(val(r,c) || '·');
-      dump.push(`L${r}: ${linha.join(' | ')}`);
+  const colLabelsNorm = table.cols.map(c=>norm(c.label));
+
+  /* ---- 1. cabeçalho do log diário ----
+     O Google às vezes promove várias linhas de título/instrução pro rótulo
+     da própria coluna (inclusive juntando tudo com a palavra "Dia" no fim,
+     de forma suja) — nesse caso os "rows" já começam direto no dado real.
+     Ancoramos por "Data", que fica sempre limpa, e "Dia" é sempre a coluna
+     logo antes dela nesse modelo de planilha. */
+  let colDia=-1, dataStartRow=0;
+  const headerMap = {};
+  const colDataAuto = colLabelsNorm.findIndex(l=>l==='data');
+  if(colDataAuto>=0){
+    for(let c=0;c<C;c++){ if(colLabelsNorm[c]) headerMap[colLabelsNorm[c]]=c; }
+    colDia = colDataAuto-1;
+    dataStartRow = 0;
+  }else{
+    // fallback: cabeçalho é uma linha normal dentro de "rows"
+    let headerRow=-1;
+    const limiteBusca = Math.min(rows.length,30);
+    for(let r=0;r<limiteBusca;r++){for(let c=0;c<C;c++){if(norm(val(r,c))==='dia'){headerRow=r;colDia=c;break}}if(headerRow>=0)break}
+    if(headerRow<0){
+      const dump = [];
+      for(let r=0;r<Math.min(rows.length,20);r++){
+        const linha = [];
+        for(let c=0;c<Math.min(C,10);c++) linha.push(val(r,c) || '·');
+        dump.push(`L${r}: ${linha.join(' | ')}`);
+      }
+      const err = new Error('Cabeçalho "Dia" não encontrado nessa aba (nem nos títulos das colunas, nem no conteúdo)');
+      err.dump = dump.join('\n');
+      throw err;
     }
-    const err = new Error('Cabeçalho "Dia" não encontrado nessa aba');
-    err.dump = dump.join('\n');
-    throw err;
+    for(let c=colDia;c<C;c++){const t=norm(val(headerRow,c));if(t)headerMap[t]=c}
+    dataStartRow = headerRow+1;
   }
-  const headerMap={};
-  for(let c=colDia;c<C;c++){const t=norm(val(headerRow,c));if(t)headerMap[t]=c}
+
   const colData=headerMap['data'], colFaltou=headerMap['faltou?'], colMetaDia=headerMap['meta dia'],
         colAcum=headerMap['acum. semana'], colSemana=headerMap['semana'];
   const colMetrica = colAcum!=null ? colAcum-1 : null;
   const dias=[];
-  for(let r=headerRow+1;r<rows.length;r++){
+  for(let r=dataStartRow;r<rows.length;r++){
     const dv=val(r,colDia); if(dv===''||dv==null) break;
     dias.push({dia:rawnum(r,colDia),data:val(r,colData),semana:colSemana!=null?rawnum(r,colSemana):null,
       realizado:colMetrica!=null?rawnum(r,colMetrica):null,acumSemana:colAcum!=null?rawnum(r,colAcum):null,
       faltou:colFaltou!=null?(norm(val(r,colFaltou))==='sim'||norm(val(r,colFaltou))==='x'):false,
       metaDia:colMetaDia!=null?rawnum(r,colMetaDia):null});
   }
-  let resumoRow=-1,resumoCol=-1;
-  for(let r=0;r<rows.length;r++){for(let c=0;c<C;c++){if(norm(val(r,c)).includes('resumo do mês')){resumoRow=r;resumoCol=c;break}}if(resumoRow>=0)break}
-  if(resumoRow<0) throw new Error('Bloco "RESUMO DO MÊS" não encontrado nessa aba');
+
+  /* ---- 2. bloco RESUMO DO MÊS (mesma lógica: cols primeiro, rows depois) ---- */
+  let resumoCol=-1, resumoStartRow=0;
+  const colResumoAuto = colLabelsNorm.findIndex(l=>l.includes('resumo do mês'));
+  if(colResumoAuto>=0){
+    resumoCol = colResumoAuto;
+    resumoStartRow = 0;
+  }else{
+    let resumoRow=-1;
+    for(let r=0;r<rows.length;r++){for(let c=0;c<C;c++){if(norm(val(r,c)).includes('resumo do mês')){resumoRow=r;resumoCol=c;break}}if(resumoRow>=0)break}
+    if(resumoRow<0) throw new Error('Bloco "RESUMO DO MÊS" não encontrado nessa aba (nem nos títulos das colunas, nem no conteúdo)');
+    resumoStartRow = resumoRow+1;
+  }
   const resumo={semanas:{}}; let mensagem='';
-  for(let r=resumoRow+1;r<rows.length;r++){
+  for(let r=resumoStartRow;r<rows.length;r++){
     const label=norm(val(r,resumoCol)); const valor=val(r,resumoCol+1); const valor2=val(r,resumoCol+2);
     if(!label) continue;
     if(label==='meta mensal') resumo.metaMensal=rawnum(r,resumoCol+1);
