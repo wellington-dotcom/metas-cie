@@ -138,8 +138,13 @@ function parseAbaIndividual(table){
     const limiteBusca = Math.min(rows.length,30);
     for(let r=0;r<limiteBusca;r++){for(let c=0;c<C;c++){if(norm(val(r,c))==='dia'){headerRow=r;colDia=c;break}}if(headerRow>=0)break}
     if(headerRow<0){
-      // não achou de nenhum jeito — monta um dump das primeiras linhas pra diagnosticar
+      // não achou de nenhum jeito — monta um dump das primeiras linhas E dos
+      // rótulos de coluna crus, pra diagnosticar sem precisar de mais uma rodada
       const dump = [];
+      dump.push('--- table.cols (rótulos de coluna crus) ---');
+      table.cols.forEach((c,i)=>{ dump.push(`col ${i}: id="${c.id}" label=${JSON.stringify(c.label)} type=${c.type}`); });
+      dump.push('');
+      dump.push('--- primeiras linhas de table.rows ---');
       for(let r=0;r<Math.min(rows.length,20);r++){
         const linha = [];
         for(let c=0;c<Math.min(C,10);c++) linha.push(val(r,c) || '·');
@@ -369,7 +374,9 @@ async function carregar(tab){
     const dicaSandbox = dentroDeIframe
       ? `<br><br><b>Isso é esperado dentro do preview do Claude:</b> por segurança, o Claude bloqueia chamadas de rede externas de dentro do artifact. Essa tela só vai puxar dados de verdade fora daqui — baixe o HTML e abra direto no navegador, ou publique num link (ex: GitHub Pages, como o outro dashboard seu).`
       : '';
-    app.innerHTML = `<div class="errbox">Não consegui ler essa aba.<br><br>${e.message}${dicaSandbox}<br><br>${
+    const urlBruta = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(pessoa.tab)}`;
+    const linkBruto = `<br><br><a href="${urlBruta}" target="_blank" style="color:var(--violet);font-weight:700">abrir resposta crua da planilha (aba ${pessoa.tab})</a>`;
+    app.innerHTML = `<div class="errbox">Não consegui ler essa aba.<br><br>${e.message}${dicaSandbox}${linkBruto}<br><br>${
       e.dump
         ? `Conteúdo cru das primeiras linhas (manda um print disso):<br><pre style="text-align:left;white-space:pre-wrap;font-size:10px;background:var(--fill);padding:10px;border-radius:10px;margin-top:8px">${e.dump}</pre>`
         : (dentroDeIframe ? '' : 'Confere se a planilha está compartilhada como "Qualquer pessoa com o link → Leitor".')
