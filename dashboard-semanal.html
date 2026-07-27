@@ -109,7 +109,7 @@ function acharAncoraPessoa(table){
     return r;
   }
 
-  const colPessoaAuto = colLabelsNorm.findIndex(l => l==='pessoa');
+  const colPessoaAuto = colLabelsNorm.findIndex(l => l.includes('pessoa'));
   if(colPessoaAuto>=0){
     return {colPessoa:colPessoaAuto, dataStartRow: primeiraLinhaDeDado(colPessoaAuto, 0)};
   }
@@ -117,7 +117,7 @@ function acharAncoraPessoa(table){
   const limite = Math.min(rows.length,40);
   for(let r=0;r<limite;r++){
     for(let c=0;c<C;c++){
-      if(norm(val(r,c))==='pessoa'){
+      if(norm(val(r,c)).includes('pessoa')){
         return {colPessoa:c, dataStartRow: primeiraLinhaDeDado(c, r+1)};
       }
     }
