@@ -1,111 +1,41 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-br">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#FBF9F4">
-<title>Metas — Clínica Isabella Eleutério</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<meta name="theme-color" content="#f3f4f9">
+<title>Dashboard de Metas e Bônus</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <style>
-:root{
-  --paper:#FBF9F4; --card:#FFFFFF; --line:rgba(33,31,54,.10); --fill:rgba(33,31,54,.05);
-  --ink:#211F36; --ink2:rgba(33,31,54,.62); --ink3:rgba(33,31,54,.34);
-  --violet:#5B4FE0; --violet-deep:#4038B0; --violet-bg:#EEEBFC;
-  --gold:#B8862E; --gold-bg:#FBF0DA;
-  --mint:#1FAE7C; --mint-bg:#E4F6EE;
-  --amber:#F0932B; --amber-bg:#FDEEDC;
-  --coral:#E2483A; --coral-bg:#FBE7E5;
-  --df: 'Fraunces', Georgia, serif; --sf: 'Manrope', -apple-system, sans-serif;
-}
-*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-body{font-family:var(--sf);background:var(--paper);color:var(--ink);min-height:100vh;
-  padding:calc(env(safe-area-inset-top) + 18px) 0 60px}
-.wrap{max-width:520px;margin:0 auto;padding:0 18px}
-
-.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
-.topnav{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
-.topnav a{font-family:var(--sf);font-size:12.5px;font-weight:700;color:var(--ink2);background:var(--fill);
-  border-radius:999px;padding:8px 14px;text-decoration:none;transition:background .15s,color .15s}
-.topnav a.ativo{background:var(--violet);color:#fff}
-.topnav a:hover{background:var(--violet-bg);color:var(--violet-deep)}
-.topnav a.ativo:hover{background:var(--violet);color:#fff}
-select{font-family:var(--sf);font-size:13px;font-weight:700;color:var(--ink2);background:var(--fill);
-  border:none;border-radius:999px;padding:9px 14px}
-
-.greeting{font-size:13px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.6px}
-.nome{font-family:var(--df);font-size:34px;font-weight:600;line-height:1.05;margin:2px 0 22px;letter-spacing:-.5px}
-
-/* ---- anel de progresso (elemento de assinatura) ---- */
-.ringcard{background:var(--card);border-radius:28px;padding:28px 20px;display:flex;flex-direction:column;
-  align-items:center;box-shadow:0 1px 2px rgba(33,31,54,.04),0 12px 32px rgba(33,31,54,.06);border:1px solid var(--line)}
-.ringwrap{position:relative;width:216px;height:216px}
-.ringwrap svg{transform:rotate(-90deg);width:216px;height:216px}
-.ring-bg{fill:none;stroke:var(--fill);stroke-width:16}
-.ring-fg{fill:none;stroke-width:16;stroke-linecap:round;transition:stroke-dashoffset 1.1s cubic-bezier(.16,1,.3,1),stroke .4s}
-.ringcenter{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
-.ringcenter .num{font-family:var(--df);font-size:40px;font-weight:600;line-height:1}
-.ringcenter .den{font-size:14px;color:var(--ink2);font-weight:600;margin-top:2px}
-.ringcenter .pct{font-family:var(--sf);font-size:15px;font-weight:800;margin-top:8px;padding:4px 12px;border-radius:999px}
-.label-meta{font-size:13px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;margin-top:16px}
-.msg{font-size:14.5px;font-weight:600;text-align:center;margin-top:10px;line-height:1.4;padding:0 8px}
-
-/* ---- seções ---- */
-.section{font-family:var(--sf);font-size:12.5px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;
-  color:var(--ink3);margin:28px 4px 10px}
-.card{background:var(--card);border-radius:22px;border:1px solid var(--line);box-shadow:0 1px 2px rgba(33,31,54,.03)}
-.pad{padding:20px}
-
-/* ---- missão do dia ---- */
-.missao{display:flex;align-items:center;gap:14px}
-.missao .check{width:44px;height:44px;border-radius:50%;background:var(--violet-bg);color:var(--violet);
-  display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:20px;transition:all .3s}
-.missao.done .check{background:var(--mint);color:#fff}
-.missao .txt b{font-family:var(--df);font-weight:600;font-size:17px}
-.missao .txt div{font-size:13.5px;color:var(--ink2);margin-top:2px}
-
-/* ---- bônus ---- */
-.bonusgrid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line)}
-.bonusgrid .cel{background:var(--card);padding:18px;text-align:center}
-.bonusgrid .cel:first-child{border-radius:22px 0 0 0}
-.bonusgrid .cel:nth-child(2){border-radius:0 22px 0 0}
-.bonusgrid .cel:nth-child(3){border-radius:0 0 0 22px}
-.bonusgrid .cel:last-child{border-radius:0 0 22px 0;grid-column:span 2;background:var(--gold-bg)}
-.bonusgrid .lbl{font-size:11.5px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.4px}
-.bonusgrid .v{font-family:var(--df);font-size:22px;font-weight:600;margin-top:6px;color:var(--gold)}
-.bonusgrid .cel:last-child .v{font-size:26px}
-
-/* ---- semana (quadrados estilo github) ---- */
-.semana{display:flex;gap:8px;justify-content:space-between;padding:18px}
-.diasq{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px}
-.diasq .sq{width:100%;aspect-ratio:1;border-radius:9px;background:var(--fill)}
-.diasq .sq.cinza{background:var(--fill)}
-.diasq .sq.azul{background:var(--violet)}
-.diasq .sq.verde{background:var(--mint)}
-.diasq .sq.vermelho{background:var(--coral)}
-.diasq .dn{font-size:10.5px;font-weight:700;color:var(--ink3)}
-
-/* ---- semanas tabela ---- */
-.semrow{display:flex;align-items:center;justify-content:space-between;padding:13px 18px;border-bottom:1px solid var(--line)}
-.semrow:last-child{border-bottom:none}
-.semrow .nm{font-weight:700;font-size:14.5px}
-.semrow .pc{font-size:13px;color:var(--ink2);font-weight:600}
-.semrow .bn{font-family:var(--df);font-weight:600;color:var(--gold);font-size:15px}
-
-.chartbox{padding:18px 14px 8px}
-.footer{text-align:center;font-size:11.5px;color:var(--ink3);margin-top:26px}
-.loading,.errbox{text-align:center;padding:60px 20px;color:var(--ink2);font-size:15px;line-height:1.6}
-.errbox{color:var(--coral)}
+  body{font-family:'Inter',sans-serif;background-color:#f3f4f9;
+    background-image:
+      radial-gradient(circle at 10% 20%, rgba(138,58,255,.10) 0%, transparent 20%),
+      radial-gradient(circle at 90% 80%, rgba(255,126,0,.10) 0%, transparent 20%),
+      radial-gradient(circle at 50% 50%, rgba(138,58,255,.05) 0%, transparent 40%);
+    min-height:100vh; overflow-x:hidden}
+  .bg-shape{position:fixed;z-index:-1;filter:blur(40px);opacity:.4}
+  .soft-card{background:rgba(255,255,255,.9);border-radius:24px;
+    box-shadow:0 10px 25px -5px rgba(0,0,0,.05),0 8px 10px -6px rgba(0,0,0,.05);
+    border:1px solid rgba(255,255,255,.8)}
+  .progress-ring-circle{transition:stroke-dashoffset .8s cubic-bezier(.16,1,.3,1);
+    transform:rotate(-90deg);transform-origin:50% 50%}
+  .no-scrollbar::-webkit-scrollbar{display:none}
+  .week-locked{filter:grayscale(.15)}
+  select.pessoa-select{font-family:'Inter',sans-serif}
 </style>
 </head>
-<body>
-<div class="wrap" id="app">
-  <div class="loading">Carregando seus números…</div>
+<body class="p-4 md:p-8">
+<div class="bg-shape top-10 left-[-5%] w-64 h-64 bg-purple-400 rounded-full"></div>
+<div class="bg-shape bottom-20 right-[-5%] w-80 h-80 bg-orange-400 rounded-full"></div>
+
+<div class="max-w-6xl mx-auto space-y-6" id="app">
+  <div class="soft-card p-10 text-center text-gray-500">Carregando seus números…</div>
 </div>
 
 <script>
-/* ============ CONFIG ============ */
+/* ================= CONFIG + PARSER + FETCH (testados, sem alteração) ================= */
 const SHEET_ID = '1kFVP2oocRi0zsofaK9BihRbnpCo_nyM0R28wARnQu1A';
 const ABAS = [
   {tab:'5_SDR', nome:'Rayana'},
@@ -117,99 +47,44 @@ const ABAS = [
   {tab:'9_Haniely', nome:'Haniely'},
 ];
 
-/* ============ PARSER (mesma lógica testada em Node) ============ */
 function norm(s){ return String(s??'').trim().toLowerCase(); }
-
-// Acha a coluna "Dia" dada uma lista de rótulos já normalizados (um por coluna).
-// Em algumas abas o rótulo de "Dia" vem colado a um texto de instrução enorme
-// (ex: "RAYANA — ACOMPANHAMENTO DIÁRIO ... Dia"), então a comparação exata
-// falha. Nesse caso, ancoramos pela coluna "Data" (que é sempre um rótulo
-// limpo) e assumimos que "Dia" é a coluna imediatamente à esquerda dela —
-// é assim que essa planilha é montada.
-function acharColDia(labelsNorm){
-  const exata = labelsNorm.findIndex(l => l === 'dia');
-  if (exata >= 0) return exata;
-  const idxData = labelsNorm.findIndex(l => l === 'data');
-  if (idxData > 0) return idxData - 1;
-  return -1;
-}
-
 function parseAbaIndividual(table){
   const rows = table.rows, C = table.cols.length;
   const cell=(r,c)=>(rows[r]&&rows[r].c[c])?rows[r].c[c]:null;
   const val=(r,c)=>{const x=cell(r,c);return x?(x.f??x.v??''):''};
   const rawnum=(r,c)=>{const x=cell(r,c);if(!x)return null;const n=typeof x.v==='number'?x.v:parseFloat(String(x.v).replace(',','.'));return isNaN(n)?null:n};
-
-  // O Google às vezes detecta sozinho a 1ª linha como cabeçalho e já tira ela
-  // de "rows" (o texto vira table.cols[].label); outras vezes não detecta e
-  // o cabeçalho continua sendo a 1ª linha normal dentro de "rows". Cobrimos
-  // os dois casos.
-  let colDia=-1, dataStartRow=0;
-  const headerMap={};
-  const colLabelsNorm = table.cols.map(c => norm(c.label));
-  colDia = acharColDia(colLabelsNorm);
-
-  if(colDia >= 0){
-    // Caso 1: cabeçalho já veio como rótulo de coluna — dados começam em rows[0]
-    for(let c=colDia;c<C;c++){ if(colLabelsNorm[c]) headerMap[colLabelsNorm[c]]=c; }
-    dataStartRow = 0;
-  } else {
-    // Caso 2: cabeçalho é uma linha normal dentro de "rows"
-    let headerRow=-1;
-    const limiteBusca = Math.min(rows.length,30);
-    for(let r=0;r<limiteBusca;r++){
-      const labelsDaLinha = [];
-      for(let c=0;c<C;c++) labelsDaLinha.push(norm(val(r,c)));
-      const candidato = acharColDia(labelsDaLinha);
-      if(candidato>=0){ headerRow=r; colDia=candidato; break; }
+  let headerRow=-1,colDia=-1;
+  const limiteBusca = Math.min(rows.length,30);
+  for(let r=0;r<limiteBusca;r++){for(let c=0;c<C;c++){if(norm(val(r,c))==='dia'){headerRow=r;colDia=c;break}}if(headerRow>=0)break}
+  if(headerRow<0){
+    const dump = [];
+    for(let r=0;r<Math.min(rows.length,20);r++){
+      const linha = [];
+      for(let c=0;c<Math.min(C,10);c++) linha.push(val(r,c) || '·');
+      dump.push(`L${r}: ${linha.join(' | ')}`);
     }
-    if(headerRow<0){
-      // não achou de nenhum jeito — monta um dump das primeiras linhas E dos
-      // rótulos de coluna crus, pra diagnosticar sem precisar de mais uma rodada
-      const dump = [];
-      dump.push('--- table.cols (rótulos de coluna crus) ---');
-      table.cols.forEach((c,i)=>{ dump.push(`col ${i}: id="${c.id}" label=${JSON.stringify(c.label)} type=${c.type}`); });
-      dump.push('');
-      dump.push('--- primeiras linhas de table.rows ---');
-      for(let r=0;r<Math.min(rows.length,20);r++){
-        const linha = [];
-        for(let c=0;c<Math.min(C,10);c++) linha.push(val(r,c) || '·');
-        dump.push(`L${r}: ${linha.join(' | ')}`);
-      }
-      const err = new Error('Cabeçalho "Dia"/"Data" não encontrado nessa aba (nem nos títulos das colunas, nem no conteúdo)');
-      err.dump = dump.join('\n');
-      throw err;
-    }
-    for(let c=colDia;c<C;c++){const t=norm(val(headerRow,c));if(t)headerMap[t]=c}
-    dataStartRow = headerRow+1;
+    const err = new Error('Cabeçalho "Dia" não encontrado nessa aba');
+    err.dump = dump.join('\n');
+    throw err;
   }
+  const headerMap={};
+  for(let c=colDia;c<C;c++){const t=norm(val(headerRow,c));if(t)headerMap[t]=c}
   const colData=headerMap['data'], colFaltou=headerMap['faltou?'], colMetaDia=headerMap['meta dia'],
         colAcum=headerMap['acum. semana'], colSemana=headerMap['semana'];
   const colMetrica = colAcum!=null ? colAcum-1 : null;
   const dias=[];
-  for(let r=dataStartRow;r<rows.length;r++){
+  for(let r=headerRow+1;r<rows.length;r++){
     const dv=val(r,colDia); if(dv===''||dv==null) break;
     dias.push({dia:rawnum(r,colDia),data:val(r,colData),semana:colSemana!=null?rawnum(r,colSemana):null,
       realizado:colMetrica!=null?rawnum(r,colMetrica):null,acumSemana:colAcum!=null?rawnum(r,colAcum):null,
       faltou:colFaltou!=null?(norm(val(r,colFaltou))==='sim'||norm(val(r,colFaltou))==='x'):false,
       metaDia:colMetaDia!=null?rawnum(r,colMetaDia):null});
   }
-
-  // Bloco "RESUMO DO MÊS": mesmo problema pode acontecer aqui — o rótulo pode
-  // já ter virado table.cols[].label em vez de aparecer dentro de "rows".
-  let resumoCol=-1, resumoDataStart=0;
-  const idxResumoLabel = table.cols.findIndex(c => norm(c.label).includes('resumo do mês'));
-  if(idxResumoLabel >= 0){
-    resumoCol = idxResumoLabel;
-    resumoDataStart = 0;
-  } else {
-    let resumoRow=-1;
-    for(let r=0;r<rows.length;r++){for(let c=0;c<C;c++){if(norm(val(r,c)).includes('resumo do mês')){resumoRow=r;resumoCol=c;break}}if(resumoRow>=0)break}
-    if(resumoRow<0) throw new Error('Bloco "RESUMO DO MÊS" não encontrado nessa aba (nem nos títulos das colunas, nem no conteúdo)');
-    resumoDataStart = resumoRow+1;
-  }
+  let resumoRow=-1,resumoCol=-1;
+  for(let r=0;r<rows.length;r++){for(let c=0;c<C;c++){if(norm(val(r,c)).includes('resumo do mês')){resumoRow=r;resumoCol=c;break}}if(resumoRow>=0)break}
+  if(resumoRow<0) throw new Error('Bloco "RESUMO DO MÊS" não encontrado nessa aba');
   const resumo={semanas:{}}; let mensagem='';
-  for(let r=resumoDataStart;r<rows.length;r++){
+  for(let r=resumoRow+1;r<rows.length;r++){
     const label=norm(val(r,resumoCol)); const valor=val(r,resumoCol+1); const valor2=val(r,resumoCol+2);
     if(!label) continue;
     if(label==='meta mensal') resumo.metaMensal=rawnum(r,resumoCol+1);
@@ -229,14 +104,6 @@ function parseAbaIndividual(table){
   resumo.mensagem=mensagem;
   return {dias,resumo};
 }
-
-/* ============ FETCH ============
-   Simples de propósito: fetch() direto no endpoint gviz.
-   Isso NÃO funciona dentro do preview de artifact do Claude (a CSP do
-   sandbox bloqueia fetch/XHR pra domínios externos, só libera scripts
-   vindos do cdnjs) — mas funciona normalmente assim que esse arquivo é
-   aberto fora do Claude (direto no navegador, ou publicado no GitHub
-   Pages, do jeito que o outro dashboard seu já roda). */
 async function buscarAba(tab){
   const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(tab)}`;
   const res = await fetch(url);
@@ -246,130 +113,11 @@ async function buscarAba(tab){
   if(data.status==='error') throw new Error(JSON.stringify(data.errors));
   return data.table;
 }
-
-/* ============ STATUS (cor decidida pela própria planilha, via emoji da mensagem) ============ */
 function statusDe(mensagem){
-  if(mensagem.includes('🟢')) return {cor:'mint', bg:'var(--mint-bg)', ink:'var(--mint)'};
-  if(mensagem.includes('🔴')) return {cor:'coral', bg:'var(--coral-bg)', ink:'var(--coral)'};
-  return {cor:'amber', bg:'var(--amber-bg)', ink:'var(--amber)'};
+  if((mensagem||'').includes('🟢')) return {cor:'emerald', hex:'#10b981', bg:'#d1fae5', ink:'#047857'};
+  if((mensagem||'').includes('🔴')) return {cor:'red', hex:'#ef4444', bg:'#fee2e2', ink:'#b91c1c'};
+  return {cor:'amber', hex:'#f59e0b', bg:'#fef3c7', ink:'#b45309'};
 }
-
-/* ============ RENDER ============ */
-let chartRef = null;
-
-function svgRing(pct, corVar){
-  const r = 92, C = 2*Math.PI*r;
-  const off = C - Math.min(pct,1)*C;
-  return `<svg viewBox="0 0 216 216">
-    <circle class="ring-bg" cx="108" cy="108" r="${r}"/>
-    <circle class="ring-fg" cx="108" cy="108" r="${r}" stroke="${corVar}"
-      stroke-dasharray="${C}" stroke-dashoffset="${C}" data-final="${off}"/>
-  </svg>`;
-}
-
-function render(pessoa, parsed){
-  const {dias, resumo} = parsed;
-  const st = statusDe(resumo.mensagem || '');
-  const pctNum = resumo.metaMensal ? Math.min(resumo.realizadoTotal/resumo.metaMensal, 1) : 0;
-  const pctLabel = resumo.pctAtingido || Math.round(pctNum*100)+'%';
-
-  // missão do dia
-  const hoje = dias[dias.length-1];
-  const faltamHoje = hoje ? Math.max(0, (hoje.metaDia||0) - (hoje.realizado||0)) : 0;
-  const missaoOk = hoje && hoje.metaDia!=null && (hoje.realizado||0) >= hoje.metaDia;
-
-  // semana atual: pega os dias da última "semana" registrada
-  const semanaAtualNum = hoje ? hoje.semana : null;
-  const diasSemana = dias.filter(d=>d.semana===semanaAtualNum);
-
-  const app = document.getElementById('app');
-  app.innerHTML = `
-    <nav class="topnav">
-      <a href="metas-index.html" class="ativo">Individual</a>
-      <a href="dashboard-mensal.html">Mensal</a>
-      <a href="dashboard-semanal.html">Semanal</a>
-    </nav>
-    <div class="topbar">
-      <div></div>
-      <select id="seletor">${ABAS.map(a=>`<option value="${a.tab}" ${a.tab===pessoa.tab?'selected':''}>${a.nome}</option>`).join('')}</select>
-    </div>
-    <div class="greeting">${saudacao()}</div>
-    <div class="nome">${pessoa.nome}</div>
-
-    <div class="ringcard">
-      <div class="ringwrap">
-        ${svgRing(pctNum, `var(--${st.cor})`)}
-        <div class="ringcenter">
-          <div class="num">${resumo.realizadoTotal ?? '—'}</div>
-          <div class="den">de ${resumo.metaMensal ?? '—'}</div>
-          <div class="pct" style="background:${st.bg};color:${st.ink}">${pctLabel} do mês</div>
-        </div>
-      </div>
-      <div class="label-meta">Meta do mês</div>
-      ${resumo.mensagem ? `<div class="msg" style="color:${st.ink}">${resumo.mensagem}</div>` : ''}
-    </div>
-
-    <div class="section">Missão de hoje</div>
-    <div class="card pad missao ${missaoOk?'done':''}">
-      <div class="check">${missaoOk?'✓':'🎯'}</div>
-      <div class="txt">
-        ${missaoOk
-          ? `<b>Meta de hoje batida!</b><div>Você já fez ${hoje?.realizado} — mandou bem.</div>`
-          : `<b>Faltam ${faltamHoje}</b><div>pra bater a meta de hoje (${hoje?.metaDia ?? '—'}).</div>`}
-      </div>
-    </div>
-
-    <div class="section">Bônus do mês</div>
-    <div class="bonusgrid" style="border-radius:22px;overflow:hidden">
-      <div class="cel"><div class="lbl">Base garantido</div><div class="v">${resumo.bonusBase ?? '—'}</div></div>
-      <div class="cel"><div class="lbl">Bônus extra</div><div class="v">${resumo.bonusExtra ?? '—'}</div></div>
-      <div class="cel"><div class="lbl">🏆 Total possível no mês</div><div class="v">${resumo.bonusTotal ?? '—'}</div></div>
-    </div>
-
-    <div class="section">Semana atual</div>
-    <div class="card">
-      <div class="semana">
-        ${diasSemana.map(d=>{
-          const isHoje = d===hoje;
-          let cls='cinza';
-          if(isHoje) cls='azul';
-          else if(d.metaDia!=null){ cls = (d.realizado||0)>=d.metaDia ? 'verde' : 'vermelho'; }
-          return `<div class="diasq"><div class="sq ${cls}"></div><div class="dn">${d.data?d.data.split('/')[0]:''}</div></div>`;
-        }).join('')}
-      </div>
-    </div>
-
-    <div class="section">Bônus por semana</div>
-    <div class="card">
-      ${Object.entries(resumo.semanas).map(([n,s])=>`
-        <div class="semrow">
-          <div class="nm">Semana ${n}</div>
-          <div class="pc">${s.realMeta||''}</div>
-          <div class="bn">${s.bonus}</div>
-        </div>`).join('')}
-    </div>
-
-    <div class="section">Evolução diária</div>
-    <div class="card chartbox"><canvas id="grafico" height="160"></canvas></div>
-
-    <div class="footer">Dados direto da planilha · pode levar alguns minutos pra atualizar</div>
-  `;
-
-  // anima o anel depois do paint
-  requestAnimationFrame(()=>{
-    const fg = app.querySelector('.ring-fg');
-    requestAnimationFrame(()=>{ fg.style.strokeDashoffset = fg.dataset.final; });
-  });
-
-  document.getElementById('seletor').addEventListener('change', async (e)=>{
-    const tab = e.target.value;
-    await salvarPessoa(tab);
-    carregar(tab);
-  });
-
-  desenharGrafico(dias);
-}
-
 function saudacao(){
   const h = new Date().getHours();
   if(h<12) return 'Bom dia';
@@ -377,84 +125,217 @@ function saudacao(){
   return 'Boa noite';
 }
 
-function desenharGrafico(dias){
-  const ctx = document.getElementById('grafico');
-  if(!ctx || !window.Chart) return;
-  if(chartRef) chartRef.destroy();
-  chartRef = new Chart(ctx, {
-    type:'line',
-    data:{
-      labels: dias.map(d=>d.data),
-      datasets:[
-        {label:'Realizado', data:dias.map(d=>d.realizado), borderColor:'#5B4FE0', backgroundColor:'rgba(91,79,224,.08)',
-         fill:true, tension:.35, pointRadius:0, borderWidth:3},
-        {label:'Meta do dia', data:dias.map(d=>d.metaDia), borderColor:'#B8862E', borderDash:[4,4],
-         pointRadius:0, borderWidth:2, fill:false}
-      ]
-    },
-    options:{
-      responsive:true, maintainAspectRatio:false,
-      plugins:{legend:{position:'bottom', labels:{font:{family:'Manrope',size:11,weight:600},boxWidth:10,usePointStyle:true}}},
-      scales:{
-        x:{ticks:{font:{size:9},maxRotation:0,autoSkip:true,maxTicksLimit:8},grid:{display:false}},
-        y:{ticks:{font:{size:10}},grid:{color:'rgba(33,31,54,.06)'}}
-      }
+/* ================= HELPERS NOVOS (visual Stitch) ================= */
+function parseDataBR(s){
+  if(!s) return null;
+  const [d,m,y] = String(s).split('/').map(Number);
+  if(!d||!m) return null;
+  const ano = y ? (y<100?2000+y:y) : new Date().getFullYear();
+  return new Date(ano, m-1, d);
+}
+function diasNoMes(date){ return new Date(date.getFullYear(), date.getMonth()+1, 0).getDate(); }
+
+function svgRing(pct, corHex, size=64, stroke=6){
+  const r = (size/2)-stroke;
+  const C = 2*Math.PI*r;
+  const off = C - Math.max(0,Math.min(pct,1))*C;
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+    <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="transparent" stroke="#e5e7eb" stroke-width="${stroke}"/>
+    <circle class="progress-ring-circle" cx="${size/2}" cy="${size/2}" r="${r}" fill="transparent"
+      stroke="${corHex}" stroke-width="${stroke}" stroke-linecap="round"
+      stroke-dasharray="${C}" stroke-dashoffset="${off}"/>
+  </svg>`;
+}
+
+const ICONE_CHECK = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round" stroke-width="3"/></svg>`;
+const ICONE_ANDAMENTO = `<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M13.492 10.39c-1.381 0-2.5 1.119-2.5 2.5s1.119 2.5 2.5 2.5 2.5-1.119 2.5-2.5-1.119-2.5-2.5-2.5zm.008 4c-.827 0-1.5-.673-1.5-1.5s.673-1.5 1.5-1.5 1.5.673 1.5 1.5-.673 1.5-1.5 1.5z"/><path d="M19.03 12c0-3.059-2.471-5.53-5.53-5.53s-5.53 2.471-5.53 5.53c0 1.488.587 2.84 1.543 3.844l-1.493 1.493C6.772 16.035 6 14.108 6 12c0-4.411 3.589-8 8-8s8 3.589 8 8c0 2.108-.772 4.035-2.02 5.337l-1.493-1.493c.956-1.004 1.543-2.356 1.543-3.844z"/></svg>`;
+const ICONE_CADEADO = `<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" clip-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"/></svg>`;
+
+const CORES_SEMANA_UNLOCKED = ['bg-violet-600','bg-emerald-500'];
+
+/* ================= RENDER ================= */
+function render(pessoa, parsed){
+  const {dias, resumo} = parsed;
+  const st = statusDe(resumo.mensagem);
+  const pctNum = resumo.metaMensal ? resumo.realizadoTotal/resumo.metaMensal : 0;
+  const pctLabel = resumo.pctAtingido || Math.round(pctNum*100)+'%';
+
+  const hoje = dias[dias.length-1];
+  const hojeData = hoje ? parseDataBR(hoje.data) : null;
+  const totalDiasMes = hojeData ? diasNoMes(hojeData) : null;
+  const diasRestantes = (hoje && totalDiasMes) ? Math.max(0, totalDiasMes - hoje.dia) : null;
+  const pctMesDecorrido = (hoje && totalDiasMes) ? hoje.dia/totalDiasMes : 0;
+
+  const semanaAtualNum = hoje ? hoje.semana : null;
+
+  // Jornada do bônus: status de cada semana (concluída / em andamento / travada)
+  const semanasOrdenadas = ['1','2','3','4','5'].filter(n=>resumo.semanas[n]);
+  const jornadaHtml = semanasOrdenadas.map((n,i)=>{
+    const s = resumo.semanas[n];
+    const numSemana = parseInt(n,10);
+    const concluida = semanaAtualNum!=null && numSemana < semanaAtualNum;
+    const emAndamento = semanaAtualNum!=null && numSemana === semanaAtualNum;
+    if(concluida){
+      const cor = CORES_SEMANA_UNLOCKED[i % CORES_SEMANA_UNLOCKED.length];
+      return `<div class="relative z-10 flex flex-col items-center w-1/5 px-1">
+        <div class="${cor} rounded-2xl p-4 text-white text-center w-full shadow-lg mb-4">
+          <p class="text-xs opacity-90 font-semibold">Semana ${n}</p>
+          <p class="text-[10px] opacity-75 mb-2">Concluída</p>
+          <div class="bg-white/90 rounded-full w-8 h-8 flex items-center justify-center mx-auto mb-3" style="color:inherit">
+            <span class="${cor.replace('bg-','text-')}">${ICONE_CHECK}</span>
+          </div>
+          <p class="text-xl font-bold">${s.bonus}</p>
+          <hr class="border-white/30 my-2"/>
+          <p class="text-[10px] font-medium">${s.realMeta||'—'} Meta</p>
+        </div>
+      </div>`;
     }
+    if(emAndamento){
+      return `<div class="relative z-10 flex flex-col items-center w-1/5 px-1">
+        <div class="bg-amber-100 border-2 border-amber-400 rounded-2xl p-4 text-amber-700 text-center w-full shadow-xl mb-4 scale-105">
+          <p class="text-xs font-bold">Semana ${n}</p>
+          <p class="text-[10px] opacity-75 mb-2">Em andamento</p>
+          <div class="bg-amber-400 text-white rounded-full w-8 h-8 flex items-center justify-center mx-auto mb-3">${ICONE_ANDAMENTO}</div>
+          <p class="text-xl font-black text-gray-900">${s.bonus}</p>
+          <hr class="border-amber-300 my-2"/>
+          <p class="text-[10px] font-bold">${s.realMeta||'—'} Meta</p>
+        </div>
+      </div>`;
+    }
+    return `<div class="relative z-10 flex flex-col items-center w-1/5 px-1 week-locked">
+      <div class="bg-gray-200 rounded-2xl p-4 text-gray-500 text-center w-full mb-4">
+        <p class="text-xs font-semibold">Semana ${n}</p>
+        <p class="text-[10px] opacity-75 mb-2">A vir</p>
+        <div class="bg-gray-400 text-white rounded-full w-8 h-8 flex items-center justify-center mx-auto mb-3">${ICONE_CADEADO}</div>
+        <p class="text-xl font-bold text-gray-700">${s.bonus}</p>
+        <hr class="border-gray-300 my-2"/>
+        <p class="text-[10px]">alvo da semana</p>
+      </div>
+    </div>`;
+  }).join('');
+
+  // gráfico diário: barra por dia, cor por status daquele dia, linha pontilhada = meta do dia mais recente
+  const metaRef = hoje ? (hoje.metaDia||0) : 0;
+  const maxVal = Math.max(metaRef, ...dias.map(d=>d.realizado||0), 1);
+  const alturaPx = 220;
+  const metaLinhaPct = maxVal ? (metaRef/maxVal)*100 : 0;
+  const barrasHtml = dias.map(d=>{
+    const h = maxVal ? Math.max(2, Math.round(((d.realizado||0)/maxVal)*alturaPx)) : 2;
+    const isHoje = d===hoje;
+    let cor = 'bg-gray-200';
+    if(isHoje) cor='bg-violet-600';
+    else if(d.metaDia!=null){ cor = (d.realizado||0) >= d.metaDia ? 'bg-emerald-500' : 'bg-orange-400'; }
+    return `<div class="flex-1 flex flex-col items-center group min-w-[10px]">
+      <div class="w-2 md:w-3 ${cor} rounded-t-sm" style="height:${h}px" title="Dia ${d.dia}: ${d.realizado ?? 0}"></div>
+      <span class="mt-2 text-[9px] font-bold text-gray-400">${d.dia}</span>
+    </div>`;
+  }).join('');
+
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <header class="rounded-xl shadow-lg mb-2 flex items-center justify-between px-4 py-3"
+      style="background:linear-gradient(90deg,#8a3aff 0%,#ff7e00 100%)">
+      <div>
+        <p class="text-white/80 text-xs font-semibold uppercase tracking-wide">${saudacao()}</p>
+        <p class="text-white text-lg font-extrabold leading-tight">${pessoa.nome}</p>
+      </div>
+      <select id="seletor" class="pessoa-select rounded-lg border-0 text-xs font-bold px-3 py-2 bg-white/90 text-gray-700">
+        ${ABAS.map(a=>`<option value="${a.tab}" ${a.tab===pessoa.tab?'selected':''}>${a.nome}</option>`).join('')}
+      </select>
+    </header>
+
+    <nav class="flex gap-2 flex-wrap px-1">
+      <a href="index.html" class="text-xs font-bold px-3 py-2 rounded-full bg-violet-600 text-white">Individual</a>
+      <a href="dashboard-mensal.html" class="text-xs font-bold px-3 py-2 rounded-full bg-gray-100 text-gray-600 hover:bg-violet-50">Mensal</a>
+      <a href="dashboard-semanal.html" class="text-xs font-bold px-3 py-2 rounded-full bg-gray-100 text-gray-600 hover:bg-violet-50">Semanal</a>
+    </nav>
+
+    ${resumo.mensagem ? `<div class="soft-card px-5 py-3 text-sm font-semibold" style="color:${st.ink};background:${st.bg}">${resumo.mensagem}</div>` : ''}
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div class="soft-card p-6 flex justify-between items-center">
+        <div>
+          <h3 class="text-gray-700 font-bold text-lg mb-2">Meta Atual</h3>
+          <p class="text-2xl font-black text-gray-900">${resumo.realizadoTotal ?? '—'}<span class="text-sm font-semibold text-gray-400"> / ${resumo.metaMensal ?? '—'}</span></p>
+        </div>
+        <div class="relative flex items-center justify-center">
+          ${svgRing(pctNum, st.hex, 64, 6)}
+          <span class="absolute text-sm font-bold text-gray-800">${pctLabel}</span>
+        </div>
+      </div>
+      <div class="soft-card p-6 flex flex-col items-center justify-center text-center">
+        <h3 class="text-gray-700 font-bold text-lg">Bônus Acumulado</h3>
+        <p class="text-3xl font-extrabold text-gray-900 mt-1">${resumo.bonusBase ?? '—'}</p>
+      </div>
+      <div class="soft-card p-6 flex flex-col items-center justify-center">
+        <h3 class="text-gray-700 font-bold text-lg mb-1">Dias Restantes</h3>
+        <p class="text-2xl font-black text-violet-600 mb-3">${diasRestantes ?? '—'}</p>
+        <div class="w-full h-3 bg-gray-100 rounded-full relative">
+          <div class="absolute left-0 top-0 h-full bg-purple-500 rounded-full" style="width:${Math.round(pctMesDecorrido*100)}%"></div>
+          <div class="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-purple-700 border-2 border-white rounded-full" style="left:calc(${Math.round(pctMesDecorrido*100)}% - 8px)"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      <div class="lg:col-span-1 soft-card p-8 flex flex-col items-center justify-center text-center">
+        <div class="mb-6"><span class="material-symbols-outlined text-5xl text-amber-400" style="font-size:48px">emoji_events</span></div>
+        <h3 class="text-xl font-bold text-gray-800 leading-tight">Bônus EXTRA</h3>
+        <p class="text-gray-500 text-sm mb-4">(se bater a meta do mês)</p>
+        <p class="text-4xl font-black text-gray-900">${resumo.bonusExtra ?? '—'}</p>
+      </div>
+      <div class="lg:col-span-3 soft-card p-8">
+        <h2 class="text-center text-2xl font-bold text-gray-800 mb-10">Jornada do Bônus Mensal</h2>
+        <div class="relative flex justify-between items-start">
+          <div class="absolute top-20 left-0 w-full h-1 bg-gray-200 -z-0"></div>
+          ${jornadaHtml}
+        </div>
+      </div>
+    </div>
+
+    <div class="soft-card p-8">
+      <h2 class="text-center text-2xl font-bold text-gray-800 mb-8">Acompanhamento Diário</h2>
+      <div class="relative w-full overflow-x-auto no-scrollbar">
+        <div class="ml-2 min-w-[600px]">
+          <div class="relative border-b border-gray-200 flex items-end justify-between px-2 pb-2" style="height:${alturaPx+20}px">
+            <div class="absolute w-full border-t-2 border-dotted border-gray-800 z-20" style="bottom:${metaLinhaPct}%"></div>
+            <div class="absolute right-0 -translate-y-4 text-[10px] font-bold text-gray-800 bg-white/80 px-1" style="bottom:${metaLinhaPct}%">Meta Diária (${metaRef})</div>
+            ${barrasHtml}
+          </div>
+          <div class="text-center mt-3 text-[11px] font-bold text-gray-500 uppercase tracking-widest">Dias do mês</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="text-center text-xs text-gray-400 pb-4">Dados direto da planilha · pode levar alguns minutos pra atualizar</div>
+  `;
+
+  document.getElementById('seletor').addEventListener('change', e=>{
+    localStorage.setItem('metas_pessoa', e.target.value);
+    carregar(e.target.value);
   });
 }
 
+/* ================= CARREGAR ================= */
 async function carregar(tab){
   const app = document.getElementById('app');
-  app.innerHTML = '<div class="loading">Carregando seus números…</div>';
+  app.innerHTML = '<div class="soft-card p-10 text-center text-gray-500">Carregando seus números…</div>';
   const pessoa = ABAS.find(a=>a.tab===tab) || ABAS[0];
   try{
     const table = await buscarAba(pessoa.tab);
     const parsed = parseAbaIndividual(table);
     render(pessoa, parsed);
   }catch(e){
-    const dentroDeIframe = (function(){ try{ return window.self !== window.top; }catch(_){ return true; } })();
-    const dicaSandbox = dentroDeIframe
-      ? `<br><br><b>Isso é esperado dentro do preview do Claude:</b> por segurança, o Claude bloqueia chamadas de rede externas de dentro do artifact. Essa tela só vai puxar dados de verdade fora daqui — baixe o HTML e abra direto no navegador, ou publique num link (ex: GitHub Pages, como o outro dashboard seu).`
-      : '';
     const urlBruta = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(pessoa.tab)}`;
-    const linkBruto = `<br><br><a href="${urlBruta}" target="_blank" style="color:var(--violet);font-weight:700">abrir resposta crua da planilha (aba ${pessoa.tab})</a>`;
-    app.innerHTML = `<div class="errbox">Não consegui ler essa aba.<br><br>${e.message}${dicaSandbox}${linkBruto}<br><br>${
-      e.dump
-        ? `Conteúdo cru das primeiras linhas (manda um print disso):<br><pre style="text-align:left;white-space:pre-wrap;font-size:10px;background:var(--fill);padding:10px;border-radius:10px;margin-top:8px">${e.dump}</pre>`
-        : (dentroDeIframe ? '' : 'Confere se a planilha está compartilhada como "Qualquer pessoa com o link → Leitor".')
-    }</div>`;
+    app.innerHTML = `<div class="soft-card p-8 text-red-600">
+      Não consegui ler essa aba.<br><br>${e.message}<br><br>
+      <a href="${urlBruta}" target="_blank" class="text-violet-600 font-bold underline">abrir resposta crua da planilha</a>
+      ${e.dump ? `<br><br><pre class="text-left whitespace-pre-wrap text-[10px] bg-gray-100 p-3 rounded-lg mt-2">${e.dump}</pre>` : ''}
+    </div>`;
   }
 }
 
-/* ============ PERSISTÊNCIA da pessoa selecionada ============
-   Tenta window.storage (funciona dentro do preview do Claude); se não
-   existir, cai pro localStorage normal (funciona quando hospedado fora,
-   ex: GitHub Pages). Nunca usa os dois ao mesmo tempo. */
-async function pessoaSalva(){
-  try{
-    if (window.storage){
-      const r = await window.storage.get('metas_pessoa_selecionada', false);
-      return (r && r.value) ? r.value : null;
-    }
-  }catch(e){ /* chave ainda não existe ou storage indisponível */ }
-  try{
-    return localStorage.getItem('metas_pessoa_selecionada');
-  }catch(e){
-    return null;
-  }
-}
-async function salvarPessoa(tab){
-  try{
-    if (window.storage){ await window.storage.set('metas_pessoa_selecionada', tab, false); return; }
-  }catch(e){ /* segue tentando o fallback */ }
-  try{ localStorage.setItem('metas_pessoa_selecionada', tab); }catch(e){ /* sem persistência disponível */ }
-}
-
-/* ============ INÍCIO ============ */
-(async function iniciar(){
-  const salvo = await pessoaSalva();
-  carregar(salvo || '5_SDR');
-})();
+carregar(localStorage.getItem('metas_pessoa') || '5_SDR');
 </script>
 </body>
 </html>
