@@ -109,12 +109,25 @@ function acharAncoraPessoa(table){
     return r;
   }
 
+  const colPessoaExato = colLabelsNorm.findIndex(l => l==='pessoa');
+  if(colPessoaExato>=0){
+    return {colPessoa:colPessoaExato, dataStartRow: primeiraLinhaDeDado(colPessoaExato, 0)};
+  }
+  const limite = Math.min(rows.length,40);
+  for(let r=0;r<limite;r++){
+    for(let c=0;c<C;c++){
+      if(norm(val(r,c))==='pessoa'){
+        return {colPessoa:c, dataStartRow: primeiraLinhaDeDado(c, r+1)};
+      }
+    }
+  }
+  /* último recurso: "contém" — pode pegar um título de seção parecido
+     (ex.: "Resultado por Pessoa"), então só tentamos isso se nada exato
+     apareceu em nenhum lugar. */
   const colPessoaAuto = colLabelsNorm.findIndex(l => l.includes('pessoa'));
   if(colPessoaAuto>=0){
     return {colPessoa:colPessoaAuto, dataStartRow: primeiraLinhaDeDado(colPessoaAuto, 0)};
   }
-
-  const limite = Math.min(rows.length,40);
   for(let r=0;r<limite;r++){
     for(let c=0;c<C;c++){
       if(norm(val(r,c)).includes('pessoa')){
