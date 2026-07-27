@@ -277,6 +277,25 @@ function saudacao(){
   return 'Boa noite';
 }
 
+/* Pede a senha antes de entrar em Mensal/Semanal (só pra evitar clique sem
+   querer — como é um arquivo estático, qualquer um que veja o código-fonte
+   acha essa senha, então isso não é segurança de verdade). Uma vez certo,
+   guarda em sessionStorage pra não pedir de novo na mesma aba. */
+function protegerGestao(e, destino){
+  e.preventDefault();
+  try{
+    if(sessionStorage.getItem('gestao_ok')==='1'){ window.location.href = destino; return false; }
+  }catch(_){}
+  const senha = prompt('Digite a senha de acesso à gestão:');
+  if(senha === 'gestaocie'){
+    try{ sessionStorage.setItem('gestao_ok','1'); }catch(_){}
+    window.location.href = destino;
+  } else if(senha !== null){
+    alert('Senha incorreta.');
+  }
+  return false;
+}
+
 /* ================= HELPERS NOVOS (visual Stitch) ================= */
 function parseDataBR(s){
   if(!s) return null;
@@ -430,8 +449,8 @@ function render(pessoa, parsed, bonusApurado, erroBonus){
 
     <nav class="flex gap-2 flex-wrap px-1">
       <a href="metas-index.html" class="text-xs font-bold px-3 py-2 rounded-full bg-violet-600 text-white">Individual</a>
-      <a href="dashboard-mensal.html" class="text-xs font-bold px-3 py-2 rounded-full bg-gray-100 text-gray-600 hover:bg-violet-50">Mensal</a>
-      <a href="dashboard-semanal.html" class="text-xs font-bold px-3 py-2 rounded-full bg-gray-100 text-gray-600 hover:bg-violet-50">Semanal</a>
+      <a href="dashboard-mensal.html" onclick="return protegerGestao(event,'dashboard-mensal.html')" class="text-xs font-bold px-3 py-2 rounded-full bg-gray-100 text-gray-600 hover:bg-violet-50">Mensal</a>
+      <a href="dashboard-semanal.html" onclick="return protegerGestao(event,'dashboard-semanal.html')" class="text-xs font-bold px-3 py-2 rounded-full bg-gray-100 text-gray-600 hover:bg-violet-50">Semanal</a>
     </nav>
 
     ${resumo.mensagem ? `<div class="soft-card px-5 py-3 text-sm font-semibold" style="color:${st.ink};background:${st.bg}">${resumo.mensagem}</div>` : ''}
