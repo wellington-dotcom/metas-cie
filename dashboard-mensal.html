@@ -105,81 +105,32 @@ async function buscarAba(tab){
   return data.table;
 }
 
-/* ============ ACHAR CABEÇALHO (mesma lógica da página individual) ============
-   O Google às vezes detecta sozinho uma linha como cabeçalho e já tira ela de
-   "rows" (o texto vira table.cols[].label); outras vezes o cabeçalho continua
-   sendo uma linha normal dentro de "rows". Cobrimos os dois casos, ancorando
-   por um rótulo que sabemos que existe (ex: "Pessoa"). */
-function acharCabecalho(table, rotuloAncora){
-  const alvo = norm(rotuloAncora);
+/* ============ ACHAR COLUNA "PESSOA" ============
+   Descoberta na prática: o Google atribui UM tipo por coluna (baseado na
+   maioria dos dados dela). Nas colunas de número (Meta mês, Realizado,
+   Bônus apurado...) qualquer texto que caia ali (o próprio cabeçalho, ou
+   texto solto tipo "jul./2026") é DESCARTADO — não aparece em lugar
+   nenhum da resposta. Só sobrevivem como texto as colunas que são texto
+   o tempo todo (Pessoa, Status, Mensagem). Por isso não dá pra confiar em
+   ler o texto do cabeçalho das colunas numéricas — a solução é achar
+   "Pessoa" (que sempre sobrevive) e usar posição relativa a ela pra tudo
+   o mais, do mesmo jeito que já fazemos no Dashboard Semanal. */
+function acharColPessoa(table){
   const rows = table.rows, C = table.cols.length;
   const val=(r,c)=>{const x=rows[r]&&rows[r].c[c];return x?(x.f??x.v??''):''};
   const colLabelsNorm = table.cols.map(c => norm(c.label));
+
+  let colPessoa = colLabelsNorm.findIndex(l => l==='pessoa');
+  if(colPessoa>=0) return {colPessoa, dataStartRow:0};
+
   const limite = Math.min(rows.length,40);
-
-  /* 4 tentativas em ordem de rigor — "contém" sozinho pode casar com um
-     título de seção parecido (ex.: "Resultado por Pessoa" contém "pessoa"
-     mas não é o cabeçalho de verdade), então só usamos isso por último. */
-  let colAncora = colLabelsNorm.findIndex(l => l===alvo);
-  if(colAncora>=0){
-    const headerMap = {};
-    for(let c=0;c<C;c++){ if(colLabelsNorm[c]) headerMap[colLabelsNorm[c]]=c; }
-    return {headerMap, dataStartRow:0, colAncora};
-  }
-  let headerRow=-1;
   for(let r=0;r<limite;r++){
-    for(let c=0;c<C;c++){ if(norm(val(r,c))===alvo){ headerRow=r; colAncora=c; break; } }
-    if(headerRow>=0) break;
+    for(let c=0;c<C;c++){ if(norm(val(r,c))==='pessoa'){ return {colPessoa:c, dataStartRow:r+1}; } }
   }
-  if(headerRow<0){
-    colAncora = colLabelsNorm.findIndex(l => l.includes(alvo));
-    if(colAncora>=0){
-      const headerMap = {};
-      for(let c=0;c<C;c++){ if(colLabelsNorm[c]) headerMap[colLabelsNorm[c]]=c; }
-      return {headerMap, dataStartRow:0, colAncora};
-    }
-  }
-  if(headerRow<0){
-    for(let r=0;r<limite;r++){
-      for(let c=0;c<C;c++){ if(norm(val(r,c)).includes(alvo)){ headerRow=r; colAncora=c; break; } }
-      if(headerRow>=0) break;
-    }
-  }
-  if(headerRow<0) return null;
-  const headerMap = {};
-  for(let c=colAncora;c<C;c++){ const t=norm(val(headerRow,c)); if(t) headerMap[t]=c; }
-  return {headerMap, dataStartRow:headerRow+1, colAncora};
-}
-
-/* Acha o valor que vem "depois" de um rótulo solto na planilha (usado pra ler
-   a tira "Visão Geral": Mês, % decorrido, Faturamento meta...). Cobre 3 casos:
-   1) o rótulo virou table.cols[].label E o valor ao lado também virou label
-      de uma coluna seguinte (a linha toda foi promovida a cabeçalho);
-   2) o rótulo virou table.cols[].label mas o valor ficou numa linha normal;
-   3) nem rótulo nem valor viraram cabeçalho — os dois são texto normal
-      dentro de "rows", na mesma linha, colunas vizinhas. */
-function buscarValorPorRotulo(table, rotulo){
-  const alvo = norm(rotulo);
-  const rows = table.rows, C = table.cols.length;
-  const val=(r,c)=>{const x=rows[r]&&rows[r].c[c];return x?(x.f??x.v??''):''};
-  const colLabelsNorm = table.cols.map(c => norm(c.label));
-  const idxCol = colLabelsNorm.findIndex(l => l===alvo);
-
-  if(idxCol>=0){
-    for(let c=idxCol+1;c<C;c++){
-      const labelVizinho = table.cols[c].label;
-      if(labelVizinho && String(labelVizinho).trim()!=='') return labelVizinho;
-    }
-    for(let r=0;r<rows.length;r++){
-      for(let c=idxCol+1;c<C;c++){ const v=val(r,c); if(v!=='') return v; }
-    }
-  }
-  for(let r=0;r<rows.length;r++){
-    for(let c=0;c<C;c++){
-      if(norm(val(r,c))===alvo){
-        for(let c2=c+1;c2<C;c2++){ const v2=val(r,c2); if(v2!=='') return v2; }
-      }
-    }
+  colPessoa = colLabelsNorm.findIndex(l => l.includes('pessoa'));
+  if(colPessoa>=0) return {colPessoa, dataStartRow:0};
+  for(let r=0;r<limite;r++){
+    for(let c=0;c<C;c++){ if(norm(val(r,c)).includes('pessoa')){ return {colPessoa:c, dataStartRow:r+1}; } }
   }
   return null;
 }
@@ -200,56 +151,66 @@ function montarDump(table){
   return dump.join('\n');
 }
 
-/* ============ PARSER ESPECÍFICO DO DASHBOARD MENSAL ============ */
+/* ============ PARSER ESPECÍFICO DO DASHBOARD MENSAL ============
+   Estrutura fixa da planilha: a partir da coluna "Pessoa", nessa ordem —
+   Meta mês, Realizado, % atingido, Projeção, % projeção, Status, Bônus
+   apurado, Faltas, Penalidade, A ser Pago, Bônus máximo, Mensagem. */
 function parseMensal(table){
-  const rows = table.rows, C = table.cols.length;
+  const rows = table.rows;
   const cell=(r,c)=>(rows[r]&&rows[r].c[c])?rows[r].c[c]:null;
   const val=(r,c)=>{const x=cell(r,c);return x?(x.f??x.v??''):''};
   const rawnum=(r,c)=>{const x=cell(r,c);if(!x)return null;const n=typeof x.v==='number'?x.v:parseFloat(String(x.v).replace(',','.'));return isNaN(n)?null:n};
 
-  const cab = acharCabecalho(table, 'pessoa');
-  if(!cab){
+  const ancora = acharColPessoa(table);
+  if(!ancora){
     const err = new Error('Cabeçalho "Pessoa" não encontrado nessa aba (nem nos títulos das colunas, nem no conteúdo)');
     err.dump = montarDump(table);
     throw err;
   }
-  const {headerMap, dataStartRow} = cab;
-  const colPessoa = headerMap['pessoa'];
-  const colMeta=headerMap['meta mês'], colReal=headerMap['realizado'], colPct=headerMap['% atingido'],
-        colProj=headerMap['projeção'], colPctProj=headerMap['% projeção'], colStatus=headerMap['status'],
-        colBonusApurado=headerMap['bônus apurado'], colFaltas=headerMap['faltas'], colPenalidade=headerMap['penalidade'],
-        colASerPago=headerMap['a ser pago'], colBonusMax=headerMap['bônus máximo'], colMsg=headerMap['mensagem'];
+  const {colPessoa, dataStartRow} = ancora;
+  const colMeta=colPessoa+1, colReal=colPessoa+2, colPct=colPessoa+3, colProj=colPessoa+4,
+        colPctProj=colPessoa+5, colStatus=colPessoa+6, colBonusApurado=colPessoa+7,
+        colFaltas=colPessoa+8, colPenalidade=colPessoa+9, colASerPago=colPessoa+10,
+        colBonusMax=colPessoa+11, colMsg=colPessoa+12;
 
   const pessoas = [];
   let totalASerPago = null;
+  let linhaVisaoGeral = -1;
+  for(let r=0;r<dataStartRow;r++){
+    if(norm(val(r,colPessoa))==='mês'){ linhaVisaoGeral = r; break; }
+  }
   for(let r=dataStartRow;r<rows.length;r++){
     const nome = val(r,colPessoa);
     if(nome===''||nome==null) break;
     if(norm(nome)==='total'){
-      totalASerPago = colASerPago!=null ? val(r,colASerPago) : null;
+      totalASerPago = val(r,colASerPago) || null;
       continue;
     }
     pessoas.push({
       nome,
       meta: val(r,colMeta), realizado: val(r,colReal),
-      pct: colPct!=null ? val(r,colPct) : null, pctNum: colPct!=null ? rawnum(r,colPct) : null,
-      projecao: val(r,colProj), pctProjecao: colPctProj!=null?val(r,colPctProj):null,
-      status: colStatus!=null ? val(r,colStatus) : '',
-      bonusApurado: colBonusApurado!=null?val(r,colBonusApurado):null,
-      faltas: colFaltas!=null?rawnum(r,colFaltas):null,
-      penalidade: colPenalidade!=null?val(r,colPenalidade):null,
-      aSerPago: colASerPago!=null?val(r,colASerPago):null,
-      bonusMax: colBonusMax!=null?val(r,colBonusMax):null,
-      mensagem: colMsg!=null?val(r,colMsg):''
+      pct: val(r,colPct)||null, pctNum: rawnum(r,colPct),
+      projecao: val(r,colProj), pctProjecao: val(r,colPctProj)||null,
+      status: val(r,colStatus),
+      bonusApurado: val(r,colBonusApurado)||null,
+      faltas: rawnum(r,colFaltas),
+      penalidade: val(r,colPenalidade)||null,
+      aSerPago: val(r,colASerPago)||null,
+      bonusMax: val(r,colBonusMax)||null,
+      mensagem: val(r,colMsg)
     });
   }
 
+  /* A tira "Visão Geral" usa as MESMAS colunas (por posição) que a tabela de
+     pessoas, só que uma linha acima. "Mês" (texto "jul./2026") e alguns
+     rótulos ficam perdidos pelo motivo explicado acima — por isso calculamos
+     o mês direto no JS em vez de depender dessa célula. */
   const visaoGeral = {
-    mes: buscarValorPorRotulo(table, 'mês'),
-    pctDecorrido: buscarValorPorRotulo(table, '% decorrido'),
-    faturamentoMeta: buscarValorPorRotulo(table, 'faturamento meta'),
-    bonusTotalPossivel: buscarValorPorRotulo(table, 'bônus total possível'),
-    totalApurado: buscarValorPorRotulo(table, 'total apurado'),
+    mes: null,
+    pctDecorrido: linhaVisaoGeral>=0 ? (val(linhaVisaoGeral,colPct)||null) : null,
+    faturamentoMeta: linhaVisaoGeral>=0 ? (val(linhaVisaoGeral,colPctProj)||null) : null,
+    bonusTotalPossivel: linhaVisaoGeral>=0 ? (val(linhaVisaoGeral,colBonusApurado)||null) : null,
+    totalApurado: linhaVisaoGeral>=0 ? (val(linhaVisaoGeral,colBonusMax)||null) : null,
     totalASerPago
   };
 
@@ -257,6 +218,11 @@ function parseMensal(table){
 }
 
 /* ============ STATUS (cor a partir do emoji) ============ */
+function mesAtualExtenso(){
+  const meses = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+  const d = new Date();
+  return meses[d.getMonth()] + '/' + d.getFullYear();
+}
 function statusDe(status){
   if((status||'').includes('🟢')) return {cor:'mint', bg:'var(--mint-bg)', ink:'var(--mint)', hex:'#1FAE7C'};
   if((status||'').includes('🔴')) return {cor:'coral', bg:'var(--coral-bg)', ink:'var(--coral)', hex:'#E2483A'};
@@ -277,7 +243,7 @@ function render(dados){
 
     <div class="greeting">Visão da gestão</div>
     <div class="nome">Dashboard Mensal</div>
-    <div class="subtitulo">${visaoGeral.mes ? 'Referente a ' + visaoGeral.mes : 'Foto consolidada do mês'}${visaoGeral.pctDecorrido ? ' · ' + visaoGeral.pctDecorrido + ' do mês decorrido' : ''}</div>
+    <div class="subtitulo">Referente a ${mesAtualExtenso()}${visaoGeral.pctDecorrido ? ' · ' + visaoGeral.pctDecorrido + ' do mês decorrido' : ''}</div>
 
     <div class="statgrid">
       <div class="cel"><div class="lbl">Faturamento meta</div><div class="v">${visaoGeral.faturamentoMeta ?? '—'}</div></div>
