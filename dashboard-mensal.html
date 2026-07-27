@@ -115,20 +115,38 @@ function acharCabecalho(table, rotuloAncora){
   const rows = table.rows, C = table.cols.length;
   const val=(r,c)=>{const x=rows[r]&&rows[r].c[c];return x?(x.f??x.v??''):''};
   const colLabelsNorm = table.cols.map(c => norm(c.label));
-  let colAncora = colLabelsNorm.findIndex(l => l.includes(alvo));
+  const limite = Math.min(rows.length,40);
 
-  const headerMap = {};
+  /* 4 tentativas em ordem de rigor — "contém" sozinho pode casar com um
+     título de seção parecido (ex.: "Resultado por Pessoa" contém "pessoa"
+     mas não é o cabeçalho de verdade), então só usamos isso por último. */
+  let colAncora = colLabelsNorm.findIndex(l => l===alvo);
   if(colAncora>=0){
-    for(let c=colAncora;c<C;c++){ if(colLabelsNorm[c]) headerMap[colLabelsNorm[c]]=c; }
+    const headerMap = {};
+    for(let c=0;c<C;c++){ if(colLabelsNorm[c]) headerMap[colLabelsNorm[c]]=c; }
     return {headerMap, dataStartRow:0, colAncora};
   }
   let headerRow=-1;
-  const limite = Math.min(rows.length,40);
   for(let r=0;r<limite;r++){
     for(let c=0;c<C;c++){ if(norm(val(r,c))===alvo){ headerRow=r; colAncora=c; break; } }
     if(headerRow>=0) break;
   }
+  if(headerRow<0){
+    colAncora = colLabelsNorm.findIndex(l => l.includes(alvo));
+    if(colAncora>=0){
+      const headerMap = {};
+      for(let c=0;c<C;c++){ if(colLabelsNorm[c]) headerMap[colLabelsNorm[c]]=c; }
+      return {headerMap, dataStartRow:0, colAncora};
+    }
+  }
+  if(headerRow<0){
+    for(let r=0;r<limite;r++){
+      for(let c=0;c<C;c++){ if(norm(val(r,c)).includes(alvo)){ headerRow=r; colAncora=c; break; } }
+      if(headerRow>=0) break;
+    }
+  }
   if(headerRow<0) return null;
+  const headerMap = {};
   for(let c=colAncora;c<C;c++){ const t=norm(val(headerRow,c)); if(t) headerMap[t]=c; }
   return {headerMap, dataStartRow:headerRow+1, colAncora};
 }
