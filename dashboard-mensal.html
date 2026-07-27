@@ -115,7 +115,7 @@ function acharCabecalho(table, rotuloAncora){
   const rows = table.rows, C = table.cols.length;
   const val=(r,c)=>{const x=rows[r]&&rows[r].c[c];return x?(x.f??x.v??''):''};
   const colLabelsNorm = table.cols.map(c => norm(c.label));
-  let colAncora = colLabelsNorm.findIndex(l => l===alvo);
+  let colAncora = colLabelsNorm.findIndex(l => l.includes(alvo));
 
   const headerMap = {};
   if(colAncora>=0){
