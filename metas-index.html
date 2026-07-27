@@ -331,7 +331,7 @@ function render(pessoa, parsed, bonusApurado, erroBonus){
     </div>`;
   }).join('');
 
-  // gráfico diário: barra por dia, cor por status daquele dia, linha pontilhada = meta do dia mais recente
+  // gráfico diário: barra por dia, cor por status daquele dia
   const maxVal = Math.max(...dias.map(d=>d.realizado||0), 1);
   const alturaPx = 180;
   const porSemana = {};
@@ -339,20 +339,22 @@ function render(pessoa, parsed, bonusApurado, erroBonus){
   const semanasDoGrafico = Object.keys(porSemana).sort((a,b)=>a-b);
   const barrasHtml = semanasDoGrafico.map(sem=>{
     const barrasDaSemana = porSemana[sem].map(d=>{
-      const h = maxVal ? Math.max(2, Math.round(((d.realizado||0)/maxVal)*alturaPx)) : 2;
+      const h = maxVal ? Math.max(4, Math.round(((d.realizado||0)/maxVal)*alturaPx)) : 4;
       const isHoje = d===hoje;
-      let cor = 'bg-gray-200';
-      if(isHoje) cor='bg-violet-600';
-      else if(d.metaDia!=null){ cor = (d.realizado||0) >= d.metaDia ? 'bg-emerald-500' : 'bg-orange-400'; }
-      return `<div class="flex flex-col items-center">
-        <div class="relative" style="height:${alturaPx}px">
-          <div class="absolute bottom-0 w-2 md:w-3 ${cor} rounded-t-sm" style="height:${h}px" title="Dia ${d.dia}: ${d.realizado!=null?Math.round(d.realizado):0} (meta: ${d.metaDia!=null?Math.round(d.metaDia):'—'})"></div>
+      let cor = '#e5e7eb';
+      if(isHoje) cor='#7c3aed';
+      else if(d.metaDia!=null){ cor = (d.realizado||0) >= d.metaDia ? '#10b981' : '#fb923c'; }
+      /* posição/tamanho em CSS inline (não depende do Tailwind já ter processado as classes a tempo) */
+      return `<div style="display:flex;flex-direction:column;align-items:center">
+        <div style="position:relative;height:${alturaPx}px;width:12px">
+          <div style="position:absolute;bottom:0;left:0;width:100%;height:${h}px;background:${cor};border-radius:3px 3px 0 0"
+            title="Dia ${d.dia}: ${d.realizado!=null?Math.round(d.realizado):0} (meta: ${d.metaDia!=null?Math.round(d.metaDia):'—'})"></div>
         </div>
         <span class="mt-1 text-[9px] font-bold text-gray-400">${d.dia}</span>
       </div>`;
     }).join('');
     return `<div class="flex flex-col items-center gap-2 px-3 border-r border-gray-100 last:border-r-0 flex-shrink-0">
-      <div class="flex items-end gap-1">${barrasDaSemana}</div>
+      <div style="display:flex;align-items:flex-end;gap:4px">${barrasDaSemana}</div>
       <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wide whitespace-nowrap">Semana ${sem}</span>
     </div>`;
   }).join('');
