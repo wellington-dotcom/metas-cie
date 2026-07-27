@@ -1,72 +1,32 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-br">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#FBF9F4">
-<title>Dashboard Semanal — Clínica Isabella Eleutério</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<meta name="theme-color" content="#f3f4f9">
+<title>Dashboard Semanal - Visão da Gestão</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet"/>
 <style>
-:root{
-  --paper:#FBF9F4; --card:#FFFFFF; --line:rgba(33,31,54,.10); --fill:rgba(33,31,54,.05);
-  --ink:#211F36; --ink2:rgba(33,31,54,.62); --ink3:rgba(33,31,54,.34);
-  --violet:#5B4FE0; --violet-deep:#4038B0; --violet-bg:#EEEBFC;
-  --gold:#B8862E; --gold-bg:#FBF0DA;
-  --mint:#1FAE7C; --mint-bg:#E4F6EE;
-  --amber:#F0932B; --amber-bg:#FDEEDC;
-  --coral:#E2483A; --coral-bg:#FBE7E5;
-  --df: 'Fraunces', Georgia, serif; --sf: 'Manrope', -apple-system, sans-serif;
-}
-*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-body{font-family:var(--sf);background:var(--paper);color:var(--ink);min-height:100vh;
-  padding:calc(env(safe-area-inset-top) + 18px) 0 60px}
-.wrap{max-width:980px;margin:0 auto;padding:0 18px}
-
-.topnav{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap}
-.topnav a{font-family:var(--sf);font-size:12.5px;font-weight:700;color:var(--ink2);background:var(--fill);
-  border-radius:999px;padding:8px 14px;text-decoration:none;transition:background .15s,color .15s}
-.topnav a.ativo{background:var(--violet);color:#fff}
-.topnav a:hover{background:var(--violet-bg);color:var(--violet-deep)}
-.topnav a.ativo:hover{background:var(--violet);color:#fff}
-
-.greeting{font-size:13px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.6px}
-.nome{font-family:var(--df);font-size:32px;font-weight:600;line-height:1.05;margin:2px 0 4px;letter-spacing:-.5px}
-.subtitulo{font-size:14px;color:var(--ink2);margin-bottom:22px}
-
-.tabela-card{background:var(--card);border-radius:20px;border:1px solid var(--line);
-  box-shadow:0 1px 2px rgba(33,31,54,.03);overflow:auto}
-table{border-collapse:collapse;width:100%;min-width:760px;font-size:13.5px}
-thead th{position:sticky;top:0;background:var(--card);font-family:var(--sf);font-size:11px;font-weight:800;
-  text-transform:uppercase;letter-spacing:.4px;color:var(--ink3);padding:14px 10px;text-align:center;
-  border-bottom:1px solid var(--line)}
-thead th.nome-col{text-align:left;padding-left:18px}
-thead th.total-col{color:var(--violet)}
-tbody td{padding:12px 10px;text-align:center;border-bottom:1px solid var(--line);vertical-align:middle}
-tbody tr:last-child td{border-bottom:none}
-td.nome-col{text-align:left;font-family:var(--df);font-weight:600;font-size:15px;padding-left:18px;white-space:nowrap}
-td.semana-cel{border-radius:12px}
-.semana-real{font-family:var(--df);font-weight:600;font-size:15px}
-.semana-meta{display:block;font-size:10.5px;color:var(--ink3);margin-top:1px}
-.semana-pct{display:block;font-size:10px;font-weight:700;margin-top:2px}
-td.total-cel{font-weight:700}
-.total-real{font-family:var(--df);font-weight:700;font-size:16px}
-.total-meta{display:block;font-size:10.5px;color:var(--ink3);margin-top:1px}
-.total-status{font-size:15px;margin-left:4px}
-
-.legenda{display:flex;gap:16px;flex-wrap:wrap;margin-top:14px;padding:0 4px}
-.legenda-item{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--ink2)}
-.legenda-dot{width:10px;height:10px;border-radius:50%}
-
-.footer{text-align:center;font-size:11.5px;color:var(--ink3);margin-top:20px;line-height:1.6}
-.loading,.errbox{text-align:center;padding:60px 20px;color:var(--ink2);font-size:15px;line-height:1.6}
-.errbox{color:var(--coral)}
-.errbox a{color:var(--violet);font-weight:700}
+  body{font-family:'Inter',sans-serif;background-color:#f3f4f9;
+    background-image:
+      radial-gradient(circle at 10% 20%, rgba(138,58,255,.10) 0%, transparent 20%),
+      radial-gradient(circle at 90% 80%, rgba(255,126,0,.10) 0%, transparent 20%),
+      radial-gradient(circle at 50% 50%, rgba(138,58,255,.05) 0%, transparent 40%);
+    min-height:100vh; overflow-x:hidden}
+  .bg-shape{position:fixed;z-index:-1;filter:blur(40px);opacity:.4}
+  .soft-card{background:rgba(255,255,255,.9);border-radius:24px;
+    box-shadow:0 10px 25px -5px rgba(0,0,0,.05),0 8px 10px -6px rgba(0,0,0,.05);
+    border:1px solid rgba(255,255,255,.8)}
+  .no-scrollbar::-webkit-scrollbar{display:none}
 </style>
 </head>
-<body>
-<div class="wrap" id="app">
-  <div class="loading">Carregando as semanas…</div>
+<body class="p-4 md:p-8">
+<div class="bg-shape top-10 left-[-5%] w-64 h-64 bg-purple-400 rounded-full"></div>
+<div class="bg-shape bottom-20 right-[-5%] w-80 h-80 bg-orange-400 rounded-full"></div>
+
+<div class="max-w-6xl mx-auto space-y-6" id="app">
+  <div class="soft-card p-10 text-center text-gray-500">Carregando as semanas…</div>
 </div>
 
 <script>
@@ -121,9 +81,6 @@ function acharAncoraPessoa(table){
       }
     }
   }
-  /* último recurso: "contém" — pode pegar um título de seção parecido
-     (ex.: "Resultado por Pessoa"), então só tentamos isso se nada exato
-     apareceu em nenhum lugar. */
   const colPessoaAuto = colLabelsNorm.findIndex(l => l.includes('pessoa'));
   if(colPessoaAuto>=0){
     return {colPessoa:colPessoaAuto, dataStartRow: primeiraLinhaDeDado(colPessoaAuto, 0)};
@@ -158,8 +115,7 @@ function montarDump(table){
    Estrutura fixa da planilha: depois da coluna "Pessoa" vêm 5 grupos de 3
    colunas (Meta/Real/%) — uma por semana — e por fim mais 3 colunas
    (Meta/Projeção/Status) com o total do mês. Isso não depende de conseguir
-   ler o cabeçalho de 2 níveis (linha "SEMANA 1/2/3..." mesclada por cima),
-   só da posição relativa à coluna "Pessoa". */
+   ler o cabeçalho de 2 níveis, só da posição relativa à coluna "Pessoa". */
 function parseSemanal(table){
   const rows = table.rows;
   const cell=(r,c)=>(rows[r]&&rows[r].c[c])?rows[r].c[c]:null;
@@ -197,53 +153,70 @@ function parseSemanal(table){
   return pessoas;
 }
 
-/* ============ COR por % (só informativo — semanas futuras naturalmente têm % baixo) ============ */
+/* ============ mesma paleta da página Individual/Mensal ============ */
 function corPct(pctNum){
-  if(pctNum==null) return {bg:'var(--fill)', ink:'var(--ink2)'};
-  if(pctNum>=1) return {bg:'var(--mint-bg)', ink:'var(--mint)'};
-  if(pctNum>=0.7) return {bg:'var(--amber-bg)', ink:'var(--amber)'};
-  return {bg:'var(--coral-bg)', ink:'var(--coral)'};
+  if(pctNum==null) return {bg:'#f3f4f6', ink:'#6b7280'};
+  if(pctNum>=1) return {bg:'#d1fae5', ink:'#047857'};
+  if(pctNum>=0.7) return {bg:'#fef3c7', ink:'#b45309'};
+  return {bg:'#fee2e2', ink:'#b91c1c'};
+}
+
+function mesAtualExtenso(){
+  const meses = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+  const d = new Date();
+  return meses[d.getMonth()] + '/' + d.getFullYear();
 }
 
 /* ============ RENDER ============ */
 function render(pessoas){
   const app = document.getElementById('app');
   app.innerHTML = `
-    <nav class="topnav">
-      <a href="metas-index.html">Individual</a>
-      <a href="dashboard-mensal.html">Mensal</a>
-      <a href="dashboard-semanal.html" class="ativo">Semanal</a>
+    <header class="rounded-xl shadow-lg mb-2 flex items-center justify-between px-4 py-3"
+      style="background:linear-gradient(90deg,#8a3aff 0%,#ff7e00 100%)">
+      <div>
+        <p class="text-white/80 text-xs font-semibold uppercase tracking-wide">Visão da gestão</p>
+        <p class="text-white text-lg font-extrabold leading-tight">Dashboard Semanal</p>
+      </div>
+      <p class="text-white text-sm font-bold">${mesAtualExtenso()}</p>
+    </header>
+
+    <nav class="flex gap-2 flex-wrap px-1">
+      <a href="index.html" class="text-xs font-bold px-3 py-2 rounded-full bg-gray-100 text-gray-600 hover:bg-violet-50">Individual</a>
+      <a href="dashboard-mensal.html" class="text-xs font-bold px-3 py-2 rounded-full bg-gray-100 text-gray-600 hover:bg-violet-50">Mensal</a>
+      <a href="dashboard-semanal.html" class="text-xs font-bold px-3 py-2 rounded-full bg-violet-600 text-white">Semanal</a>
     </nav>
 
-    <div class="greeting">Visão da gestão</div>
-    <div class="nome">Dashboard Semanal</div>
-    <div class="subtitulo">Meta e realizado por semana, pessoa a pessoa</div>
-
-    <div class="tabela-card">
-      <table>
+    <div class="soft-card p-6 overflow-x-auto no-scrollbar">
+      <table class="w-full border-collapse" style="min-width:760px">
         <thead>
-          <tr>
-            <th class="nome-col">Pessoa</th>
-            <th>Semana 1</th><th>Semana 2</th><th>Semana 3</th><th>Semana 4</th><th>Semana 5</th>
-            <th class="total-col">Total do mês</th>
+          <tr class="border-b border-gray-100">
+            <th class="text-left text-[11px] font-bold text-gray-400 uppercase tracking-wide pb-3 pl-2">Pessoa</th>
+            <th class="text-[11px] font-bold text-gray-400 uppercase tracking-wide pb-3 text-center">Semana 1</th>
+            <th class="text-[11px] font-bold text-gray-400 uppercase tracking-wide pb-3 text-center">Semana 2</th>
+            <th class="text-[11px] font-bold text-gray-400 uppercase tracking-wide pb-3 text-center">Semana 3</th>
+            <th class="text-[11px] font-bold text-gray-400 uppercase tracking-wide pb-3 text-center">Semana 4</th>
+            <th class="text-[11px] font-bold text-gray-400 uppercase tracking-wide pb-3 text-center">Semana 5</th>
+            <th class="text-[11px] font-bold text-violet-600 uppercase tracking-wide pb-3 text-center">Total do mês</th>
           </tr>
         </thead>
         <tbody>
           ${pessoas.map(p=>{
             const semanasHtml = p.semanas.map(s=>{
               const c = corPct(s.pctNum);
-              return `<td class="semana-cel" style="background:${c.bg}">
-                <span class="semana-real" style="color:${c.ink}">${s.real || 0}</span>
-                <span class="semana-meta">meta ${s.meta ?? '—'}</span>
-                <span class="semana-pct" style="color:${c.ink}">${s.pct ?? ''}</span>
+              return `<td class="py-3 px-1 text-center">
+                <div class="rounded-xl py-2" style="background:${c.bg}">
+                  <p class="font-bold text-sm" style="color:${c.ink}">${s.real || 0}</p>
+                  <p class="text-[10px] text-gray-400">meta ${s.meta ?? '—'}</p>
+                  <p class="text-[10px] font-bold" style="color:${c.ink}">${s.pct ?? ''}</p>
+                </div>
               </td>`;
             }).join('');
-            return `<tr>
-              <td class="nome-col">${p.nome}</td>
+            return `<tr class="border-b border-gray-100 last:border-b-0">
+              <td class="py-3 pl-2 font-bold text-gray-800 whitespace-nowrap">${p.nome}</td>
               ${semanasHtml}
-              <td class="total-cel">
-                <span class="total-real">${p.total.projecao ?? '—'}</span><span class="total-status">${p.total.status||''}</span>
-                <span class="total-meta">meta ${p.total.meta ?? '—'}</span>
+              <td class="py-3 px-1 text-center">
+                <p class="font-black text-base text-gray-900">${p.total.projecao ?? '—'} <span class="text-base">${p.total.status||''}</span></p>
+                <p class="text-[10px] text-gray-400">meta ${p.total.meta ?? '—'}</p>
               </td>
             </tr>`;
           }).join('')}
@@ -251,20 +224,20 @@ function render(pessoas){
       </table>
     </div>
 
-    <div class="legenda">
-      <div class="legenda-item"><span class="legenda-dot" style="background:var(--mint)"></span>Meta batida (≥100%)</div>
-      <div class="legenda-item"><span class="legenda-dot" style="background:var(--amber)"></span>Perto (70–99%)</div>
-      <div class="legenda-item"><span class="legenda-dot" style="background:var(--coral)"></span>Abaixo (&lt;70%)</div>
+    <div class="flex gap-4 flex-wrap px-1 text-[11px] font-semibold text-gray-500">
+      <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-emerald-500 inline-block"></span>Meta batida (≥100%)</span>
+      <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-amber-400 inline-block"></span>Perto (70–99%)</span>
+      <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-red-500 inline-block"></span>Abaixo (&lt;70%)</span>
     </div>
 
-    <div class="footer">Semanas futuras aparecem com % baixo naturalmente — ainda não deu tempo de realizar. A coluna final usa a projeção (no ritmo atual) como número principal.</div>
+    <div class="text-center text-xs text-gray-400 pb-4">Semanas futuras aparecem com % baixo naturalmente — ainda não deu tempo de realizar. A coluna final usa a projeção (no ritmo atual) como número principal.</div>
   `;
 }
 
 /* ============ CARREGAR ============ */
 async function carregar(){
   const app = document.getElementById('app');
-  app.innerHTML = '<div class="loading">Carregando as semanas…</div>';
+  app.innerHTML = '<div class="soft-card p-10 text-center text-gray-500">Carregando as semanas…</div>';
   try{
     const table = await buscarAba(TAB);
     const pessoas = parseSemanal(table);
@@ -272,15 +245,15 @@ async function carregar(){
   }catch(e){
     const dentroDeIframe = (function(){ try{ return window.self !== window.top; }catch(_){ return true; } })();
     const dicaSandbox = dentroDeIframe
-      ? `<br><br><b>Isso é esperado dentro do preview do Claude:</b> por segurança, o Claude bloqueia chamadas de rede externas de dentro do artifact. Essa tela só vai puxar dados de verdade fora daqui — publicada (ex: GitHub Pages).`
+      ? `<p class="mt-3 text-sm text-gray-600"><b>Isso é esperado dentro do preview do Claude:</b> por segurança, o Claude bloqueia chamadas de rede externas de dentro do artifact. Essa tela só vai puxar dados de verdade fora daqui — publicada (ex: GitHub Pages).</p>`
       : '';
     const urlBruta = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(TAB)}`;
-    const linkBruto = `<br><br><a href="${urlBruta}" target="_blank">abrir resposta crua da planilha (aba ${TAB})</a>`;
-    app.innerHTML = `<div class="errbox">Não consegui ler o Dashboard Semanal.<br><br>${e.message}${dicaSandbox}${linkBruto}<br><br>${
-      e.dump
-        ? `Conteúdo cru (manda um print disso):<br><pre style="text-align:left;white-space:pre-wrap;font-size:10px;background:var(--fill);padding:10px;border-radius:10px;margin-top:8px">${e.dump}</pre>`
-        : ''
-    }</div>`;
+    app.innerHTML = `<div class="soft-card p-8 text-red-600">
+      Não consegui ler o Dashboard Semanal.<br><br>${e.message}
+      ${dicaSandbox}<br>
+      <a href="${urlBruta}" target="_blank" class="text-violet-600 font-bold underline">abrir resposta crua da planilha (aba ${TAB})</a>
+      ${e.dump ? `<br><br><pre class="text-left whitespace-pre-wrap text-[10px] bg-gray-100 p-3 rounded-lg mt-2">${e.dump}</pre>` : ''}
+    </div>`;
   }
 }
 
