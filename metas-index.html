@@ -175,7 +175,15 @@ async function buscarAba(tab){
    base" da aba individual, que soma o valor ALVO de cada semana mesmo pras
    que ainda não terminaram (a planilha só conta o bônus quando a semana
    encerra). Falha graciosamente: se der errado, devolve null e a tela
-   principal continua funcionando normalmente. */
+   principal continua funcionando normalmente.
+
+   Descoberta na prática: o Google atribui UM tipo por coluna (baseado na
+   maioria dos dados dela). Nas colunas de número (Meta mês, Realizado,
+   Bônus apurado...) o próprio texto do cabeçalho é DESCARTADO — não
+   sobrevive em lugar nenhum da resposta, só nas colunas que são texto o
+   tempo todo (Pessoa, Status, Mensagem). Por isso não dá pra procurar o
+   texto "Bônus apurado" — usamos posição relativa à coluna "Pessoa"
+   (Bônus apurado é sempre a 7ª coluna depois de Pessoa nessa planilha). */
 async function buscarBonusApurado(nomePessoa){
   try{
     const table = await buscarAba('2_Dashboard_Mensal');
@@ -184,56 +192,20 @@ async function buscarBonusApurado(nomePessoa){
     const val=(r,c)=>{const x=cell(r,c);return x?(x.f??x.v??''):''};
     const colLabelsNorm = table.cols.map(c=>norm(c.label));
 
-    /* acha a coluna "Pessoa" em 4 tentativas, da mais estrita pra mais larga:
-       1) rótulo de coluna EXATO "pessoa" (cabeçalho já promovido pelo Google)
-       2) célula EXATA "pessoa" numa linha normal
-       3) rótulo de coluna que CONTÉM "pessoa" (título grudado, ex.: "...Pessoa")
-       4) célula que CONTÉM "pessoa" numa linha normal
-       Nessa ordem porque "contém" sozinho pega até "Resultado por Pessoa"
-       (um título de seção, não o cabeçalho de verdade) — só usamos isso se
-       nada exato for encontrado antes. */
-    let colPessoa=-1, headerRow=-1;
+    let colPessoa=-1, dataStartRow=0;
     colPessoa = colLabelsNorm.findIndex(l=>l==='pessoa');
     if(colPessoa<0){
       const limite=Math.min(rows.length,40);
-      for(let r=0;r<limite;r++){for(let c=0;c<C;c++){if(norm(val(r,c))==='pessoa'){headerRow=r;colPessoa=c;break}}if(headerRow>=0)break}
+      for(let r=0;r<limite;r++){for(let c=0;c<C;c++){if(norm(val(r,c))==='pessoa'){dataStartRow=r+1;colPessoa=c;break}}if(colPessoa>=0)break}
     }
-    if(colPessoa<0){
-      colPessoa = colLabelsNorm.findIndex(l=>l.includes('pessoa'));
-    }
+    if(colPessoa<0) colPessoa = colLabelsNorm.findIndex(l=>l.includes('pessoa'));
     if(colPessoa<0){
       const limite=Math.min(rows.length,40);
-      for(let r=0;r<limite;r++){for(let c=0;c<C;c++){if(norm(val(r,c)).includes('pessoa')){headerRow=r;colPessoa=c;break}}if(headerRow>=0)break}
+      for(let r=0;r<limite;r++){for(let c=0;c<C;c++){if(norm(val(r,c)).includes('pessoa')){dataStartRow=r+1;colPessoa=c;break}}if(colPessoa>=0)break}
     }
     if(colPessoa<0) return {valor:null, erro:'coluna "Pessoa" não encontrada de nenhuma forma (exata ou aproximada)'};
 
-    const headerMap={};
-    let dataStartRow=0;
-    /* mescla as duas fontes sempre: cols[].label (parece que colunas
-       NUMÉRICAS mantêm o rótulo limpo aqui mesmo sem "promoção" completa)
-       e a própria linha onde achamos "Pessoa" (colunas de TEXTO, tipo
-       Status/Mensagem, parecem manter o rótulo só na linha). */
-    for(let c=0;c<C;c++){ if(colLabelsNorm[c]) headerMap[colLabelsNorm[c]]=c; }
-    if(headerRow>=0){
-      for(let c=0;c<C;c++){ const t=norm(val(headerRow,c)); if(t) headerMap[t]=c; }
-      dataStartRow=headerRow+1;
-    }
-    let colBonusApurado = headerMap['bônus apurado'];
-    if(colBonusApurado==null){
-      const k = Object.keys(headerMap).find(k=>k.includes('bônus')&&k.includes('apurado'));
-      if(k) colBonusApurado = headerMap[k];
-    }
-    if(colBonusApurado==null){
-      const dump=[];
-      dump.push('--- table.cols ---');
-      table.cols.forEach((c,i)=>dump.push(`col ${i}: label=${JSON.stringify(c.label)} type=${c.type}`));
-      dump.push('--- primeiras linhas ---');
-      for(let r=0;r<Math.min(rows.length,10);r++){
-        const linha=[]; for(let c=0;c<Math.min(C,14);c++) linha.push(val(r,c)||'·');
-        dump.push(`L${r}: ${linha.join(' | ')}`);
-      }
-      return {valor:null, erro:'coluna "Bônus apurado" não encontrada. Colunas vistas: '+Object.keys(headerMap).join(' | '), dump:dump.join('\n')};
-    }
+    const colBonusApurado = colPessoa+7;
     for(let r=dataStartRow;r<rows.length;r++){
       const nome = val(r,colPessoa);
       if(nome===''||nome==null) break;
@@ -300,7 +272,7 @@ const ICONE_CADEADO = `<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 
 const ICONE_X = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" stroke-linecap="round" stroke-linejoin="round" stroke-width="3"/></svg>`;
 
 /* ================= RENDER ================= */
-function render(pessoa, parsed, bonusApurado, erroBonus, dumpBonus){
+function render(pessoa, parsed, bonusApurado, erroBonus){
   const {dias, resumo} = parsed;
   const st = statusDe(resumo.mensagem);
   const pctNum = resumo.metaMensal ? resumo.realizadoTotal/resumo.metaMensal : 0;
@@ -429,7 +401,6 @@ function render(pessoa, parsed, bonusApurado, erroBonus, dumpBonus){
         <p class="text-3xl font-extrabold text-gray-900 mt-1">${bonusApurado ?? '—'}</p>
         <p class="text-[11px] text-gray-400 mt-1">já garantido (líquido de falta)</p>
         ${erroBonus?`<p class="text-[9px] text-red-400 mt-1">debug: ${String(erroBonus).replace(/</g,'&lt;')}</p>`:''}
-        ${dumpBonus?`<pre class="text-left whitespace-pre-wrap text-[9px] bg-gray-100 p-2 rounded-lg mt-2">${String(dumpBonus).replace(/</g,'&lt;')}</pre>`:''}
       </div>
       <div class="soft-card p-6 flex flex-col items-center justify-center">
         <h3 class="text-gray-700 font-bold text-lg mb-1">Dias Restantes</h3>
@@ -488,8 +459,8 @@ async function carregar(tab){
   try{
     const table = await buscarAba(pessoa.tab);
     const parsed = parseAbaIndividual(table);
-    const {valor:bonusApurado, erro:erroBonus, dump:dumpBonus} = await buscarBonusApurado(pessoa.nome);
-    render(pessoa, parsed, bonusApurado, erroBonus, dumpBonus);
+    const {valor:bonusApurado, erro:erroBonus} = await buscarBonusApurado(pessoa.nome);
+    render(pessoa, parsed, bonusApurado, erroBonus);
   }catch(e){
     const urlBruta = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(pessoa.tab)}`;
     app.innerHTML = `<div class="soft-card p-8 text-red-600">
