@@ -55,53 +55,101 @@ function parseAbaIndividual(table){
   const rawnum=(r,c)=>{const x=cell(r,c);if(!x)return null;const n=typeof x.v==='number'?x.v:parseFloat(String(x.v).replace(',','.'));return isNaN(n)?null:n};
   const colLabelsNorm = table.cols.map(c=>norm(c.label));
 
-  /* ---- 1. cabeçalho do log diário ----
-     O Google às vezes promove várias linhas de título/instrução pro rótulo
-     da própria coluna (inclusive juntando tudo com a palavra "Dia" no fim,
-     de forma suja) — nesse caso os "rows" já começam direto no dado real.
-     Ancoramos por "Data", que fica sempre limpa, e "Dia" é sempre a coluna
-     logo antes dela nesse modelo de planilha. */
-  let colDia=-1, dataStartRow=0;
-  const headerMap = {};
-  const colDataAuto = colLabelsNorm.findIndex(l=>l==='data');
-  if(colDataAuto>=0){
-    for(let c=0;c<C;c++){ if(colLabelsNorm[c]) headerMap[colLabelsNorm[c]]=c; }
-    colDia = colDataAuto-1;
-    dataStartRow = 0;
-  }else{
-    // fallback: cabeçalho é uma linha normal dentro de "rows"
-    let headerRow=-1;
-    const limiteBusca = Math.min(rows.length,30);
-    for(let r=0;r<limiteBusca;r++){for(let c=0;c<C;c++){if(norm(val(r,c))==='dia'){headerRow=r;colDia=c;break}}if(headerRow>=0)break}
-    if(headerRow<0){
-      const dump = [];
-      for(let r=0;r<Math.min(rows.length,20);r++){
-        const linha = [];
-        for(let c=0;c<Math.min(C,10);c++) linha.push(val(r,c) || '·');
-        dump.push(`L${r}: ${linha.join(' | ')}`);
-      }
-      const err = new Error('Cabeçalho "Dia" não encontrado nessa aba (nem nos títulos das colunas, nem no conteúdo)');
-      err.dump = dump.join('\n');
-      throw err;
+  /* ---- 1. coluna "Data" e início dos dados ----
+     Em abas com linhas de título antes do cabeçalho real (ex: "ISADORA —
+     ACOMPANHAMENTO DIÁRIO"), o Google pode não conseguir promover NADA a
+     cabeçalho — e aí qualquer texto solto ("Dia","Data","Semana"...) cai
+     dentro de colunas cujo tipo é number/date e é DESCARTADO (mesmo motivo
+     do Dashboard Mensal). Por isso não confiamos no texto: usamos o TIPO
+     de cada coluna (table.cols[c].type), que o Google sempre preserva,
+     não importa o que aconteça com o cabeçalho. A coluna "Data" é sempre
+     a primeira do tipo "date"; "Dia" é sempre a coluna logo antes dela. */
+  let colDia=-1, colData=-1, dataStartRow=0;
+  for(let c=1;c<C;c++){ if(table.cols[c].type==='date'){ colData=c; break; } }
+
+  if(colData>=0){
+    colDia = colData-1;
+    // acha a 1ª linha que já tem um número de verdade na coluna "Dia"
+    // (pula título/subtítulo/cabeçalho, sejam eles quais forem)
+    let achou=false;
+    for(let r=0;r<Math.min(rows.length,40);r++){
+      if(rawnum(r,colDia)!=null){ dataStartRow=r; achou=true; break; }
     }
-    for(let c=colDia;c<C;c++){const t=norm(val(headerRow,c));if(t)headerMap[t]=c}
-    dataStartRow = headerRow+1;
+    if(!achou) colDia=-1; // não achou nenhuma linha de dado -> cai no fallback
   }
 
-  const colData=headerMap['data'], colFaltou=headerMap['faltou?'], colMetaDia=headerMap['meta dia'],
-        colAcum=headerMap['acum. semana'], colSemana=headerMap['semana'];
+  const headerMap = {};
+  if(colDia<0){
+    /* fallback: abas mais simples, onde o texto do cabeçalho sobrevive
+       (promovido a table.cols[].label, ou como linha normal em "rows"). */
+    const colDataAuto = colLabelsNorm.findIndex(l=>l==='data');
+    if(colDataAuto>=0){
+      for(let c=0;c<C;c++){ if(colLabelsNorm[c]) headerMap[colLabelsNorm[c]]=c; }
+      colDia = colDataAuto-1;
+      dataStartRow = 0;
+    }else{
+      let headerRow=-1;
+      const limiteBusca = Math.min(rows.length,30);
+      for(let r=0;r<limiteBusca;r++){for(let c=0;c<C;c++){if(norm(val(r,c))==='dia'){headerRow=r;colDia=c;break}}if(headerRow>=0)break}
+      if(headerRow<0){
+        const dump = [];
+        dump.push('--- table.cols (rótulos e tipos crus) ---');
+        table.cols.forEach((c,i)=>{ dump.push(`col ${i}: label=${JSON.stringify(c.label)} type=${c.type}`); });
+        dump.push('');
+        dump.push('--- primeiras linhas de table.rows ---');
+        for(let r=0;r<Math.min(rows.length,20);r++){
+          const linha = [];
+          for(let c=0;c<Math.min(C,16);c++) linha.push(val(r,c) || '·');
+          dump.push(`L${r}: ${linha.join(' | ')}`);
+        }
+        const err = new Error('Cabeçalho "Dia" não encontrado nessa aba (nem pelo tipo da coluna, nem pelos títulos, nem pelo conteúdo)');
+        err.dump = dump.join('\n');
+        throw err;
+      }
+      for(let c=colDia;c<C;c++){const t=norm(val(headerRow,c));if(t)headerMap[t]=c}
+      dataStartRow = headerRow+1;
+    }
+  }
+
+  /* ---- 2. Semana, Acum., Faltou?, Meta dia ----
+     "Dia, Data, Dia sem., Semana" vêm sempre nessa ordem fixa nesse
+     modelo de planilha. Já a coluna acumulada muda de nome E de posição
+     (o número de colunas de métrica varia por função), então achamos ela
+     pelo COMPORTAMENTO dos valores: é a primeira coluna, depois de
+     "Semana", cujos números só sobem (ou empatam) dentro de cada semana e
+     reiniciam quando a semana muda — isso não depende de nome nenhum. */
+  const colSemana = colDia+3;
+  function acharColAcum(){
+    for(let cand=colSemana+1; cand<C; cand++){
+      let ok=true, testouAlgo=false, anterior=null, semanaAnterior;
+      for(let r=dataStartRow;r<rows.length;r++){
+        const dv=rawnum(r,colDia); if(dv==null) break;
+        const semAtual = rawnum(r,colSemana);
+        if(semAtual!==semanaAnterior){ anterior=null; semanaAnterior=semAtual; }
+        const v = rawnum(r,cand);
+        if(v==null) continue;
+        testouAlgo=true;
+        if(anterior!=null && v<anterior-0.01){ ok=false; break; }
+        anterior=v;
+      }
+      if(ok && testouAlgo) return cand;
+    }
+    return null;
+  }
+  const colAcum = headerMap['acum. semana'] ?? acharColAcum();
+  const colFaltou = headerMap['faltou?'] ?? (colAcum!=null ? colAcum+1 : null);
+  const colMetaDia = headerMap['meta dia'] ?? (colAcum!=null ? colAcum+2 : null);
+  const colData_ = headerMap['data'] ?? colData;
 
   /* A coluna com o valor realizado do dia muda de nome (e de posição) pra
-     cada função — "Pacientes com presença", "Leads gerados", "Procedimentos
-     atendidos" etc. Em vez de supor "é sempre a coluna antes de Acum.
-     semana" (o que quebra quando o cargo tem uma quantidade diferente de
-     colunas de entrada), a gente TESTA: soma cada coluna candidata dentro
-     da semana e vê qual delas realmente reproduz os valores de "Acum.
-     semana" — essa é a métrica de verdade. */
+     cada função — "Pacientes com presença", "Propostas", "Leads gerados"
+     etc. Em vez de supor uma posição fixa, TESTAMOS: soma cada coluna
+     candidata dentro da semana e vemos qual delas realmente reproduz os
+     valores de "Acum." — essa é a métrica de verdade. */
   function acharColMetrica(){
     if(colAcum==null || colDia==null) return null;
-    for(let cand=colAcum-1; cand>colDia; cand--){
-      let acumCalc=0, semanaAnterior=undefined, bateu=true, testouAlgo=false;
+    for(let cand=colAcum-1; cand>colSemana; cand--){
+      let acumCalc=0, semanaAnterior, bateu=true, testouAlgo=false;
       for(let r=dataStartRow;r<rows.length;r++){
         const dv=val(r,colDia); if(dv===''||dv==null) break;
         const semAtual = colSemana!=null?rawnum(r,colSemana):null;
@@ -115,19 +163,22 @@ function parseAbaIndividual(table){
       }
       if(bateu && testouAlgo) return cand;
     }
-    return colAcum-1; // nada bateu -> mantém a heurística antiga como último recurso
+    return colAcum!=null ? colAcum-1 : null;
   }
   const colMetrica = acharColMetrica();
   const dias=[];
   for(let r=dataStartRow;r<rows.length;r++){
     const dv=val(r,colDia); if(dv===''||dv==null) break;
-    dias.push({dia:rawnum(r,colDia),data:val(r,colData),semana:colSemana!=null?rawnum(r,colSemana):null,
+    dias.push({dia:rawnum(r,colDia),data:val(r,colData_),semana:colSemana!=null?rawnum(r,colSemana):null,
       realizado:colMetrica!=null?rawnum(r,colMetrica):null,acumSemana:colAcum!=null?rawnum(r,colAcum):null,
       faltou:colFaltou!=null?(norm(val(r,colFaltou))==='sim'||norm(val(r,colFaltou))==='x'):false,
       metaDia:colMetaDia!=null?rawnum(r,colMetaDia):null});
   }
 
-  /* ---- 2. bloco RESUMO DO MÊS (mesma lógica: cols primeiro, rows depois) ---- */
+  /* ---- 3. bloco RESUMO DO MÊS ----
+     Essa coluna é sempre texto (rótulos como "Meta mensal", mensagens
+     etc.), então o nome dela sobrevive normalmente — mantemos a busca por
+     texto aqui, primeiro nos rótulos de coluna, depois nas linhas. */
   let resumoCol=-1, resumoStartRow=0;
   const colResumoAuto = colLabelsNorm.findIndex(l=>l.includes('resumo do mês'));
   if(colResumoAuto>=0){
