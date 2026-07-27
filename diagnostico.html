@@ -119,8 +119,20 @@ function parseAbaIndividual(table){
   const val=(r,c)=>{const x=cell(r,c);return x?(x.f??x.v??''):''};
   const rawnum=(r,c)=>{const x=cell(r,c);if(!x)return null;const n=typeof x.v==='number'?x.v:parseFloat(String(x.v).replace(',','.'));return isNaN(n)?null:n};
   let headerRow=-1,colDia=-1;
-  for(let r=0;r<Math.min(rows.length,6);r++){for(let c=0;c<C;c++){if(norm(val(r,c))==='dia'){headerRow=r;colDia=c;break}}if(headerRow>=0)break}
-  if(headerRow<0) throw new Error('Cabeçalho "Dia" não encontrado nessa aba');
+  const limiteBusca = Math.min(rows.length,30);
+  for(let r=0;r<limiteBusca;r++){for(let c=0;c<C;c++){if(norm(val(r,c))==='dia'){headerRow=r;colDia=c;break}}if(headerRow>=0)break}
+  if(headerRow<0){
+    // não achou — monta um dump das primeiras linhas pra diagnosticar sem precisar de outra rodada
+    const dump = [];
+    for(let r=0;r<Math.min(rows.length,20);r++){
+      const linha = [];
+      for(let c=0;c<Math.min(C,10);c++) linha.push(val(r,c) || '·');
+      dump.push(`L${r}: ${linha.join(' | ')}`);
+    }
+    const err = new Error('Cabeçalho "Dia" não encontrado nessa aba');
+    err.dump = dump.join('\n');
+    throw err;
+  }
   const headerMap={};
   for(let c=colDia;c<C;c++){const t=norm(val(headerRow,c));if(t)headerMap[t]=c}
   const colData=headerMap['data'], colFaltou=headerMap['faltou?'], colMetaDia=headerMap['meta dia'],
@@ -159,7 +171,13 @@ function parseAbaIndividual(table){
   return {dias,resumo};
 }
 
-/* ============ FETCH ============ */
+/* ============ FETCH ============
+   Simples de propósito: fetch() direto no endpoint gviz.
+   Isso NÃO funciona dentro do preview de artifact do Claude (a CSP do
+   sandbox bloqueia fetch/XHR pra domínios externos, só libera scripts
+   vindos do cdnjs) — mas funciona normalmente assim que esse arquivo é
+   aberto fora do Claude (direto no navegador, ou publicado no GitHub
+   Pages, do jeito que o outro dashboard seu já roda). */
 async function buscarAba(tab){
   const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(tab)}`;
   const res = await fetch(url);
@@ -204,7 +222,6 @@ function render(pessoa, parsed){
   // semana atual: pega os dias da última "semana" registrada
   const semanaAtualNum = hoje ? hoje.semana : null;
   const diasSemana = dias.filter(d=>d.semana===semanaAtualNum);
-  const nomesDias = ['D','S','T','Q','Q','S','S'];
 
   const app = document.getElementById('app');
   app.innerHTML = `
@@ -249,7 +266,6 @@ function render(pessoa, parsed){
     <div class="card">
       <div class="semana">
         ${diasSemana.map(d=>{
-          const dow = d.data ? new Date(d.data.split('/').reverse().join('-')+'T00:00:00') : null;
           const isHoje = d===hoje;
           let cls='cinza';
           if(isHoje) cls='azul';
@@ -281,9 +297,10 @@ function render(pessoa, parsed){
     requestAnimationFrame(()=>{ fg.style.strokeDashoffset = fg.dataset.final; });
   });
 
-  document.getElementById('seletor').addEventListener('change', e=>{
-    localStorage.setItem('metas_pessoa', e.target.value);
-    carregar(e.target.value);
+  document.getElementById('seletor').addEventListener('change', async (e)=>{
+    const tab = e.target.value;
+    await salvarPessoa(tab);
+    carregar(tab);
   });
 
   desenharGrafico(dias);
@@ -331,11 +348,47 @@ async function carregar(tab){
     const parsed = parseAbaIndividual(table);
     render(pessoa, parsed);
   }catch(e){
-    app.innerHTML = `<div class="errbox">Não consegui ler essa aba.<br><br>${e.message}<br><br>Confere se a planilha está compartilhada como "Qualquer pessoa com o link → Leitor".</div>`;
+    const dentroDeIframe = (function(){ try{ return window.self !== window.top; }catch(_){ return true; } })();
+    const dicaSandbox = dentroDeIframe
+      ? `<br><br><b>Isso é esperado dentro do preview do Claude:</b> por segurança, o Claude bloqueia chamadas de rede externas de dentro do artifact. Essa tela só vai puxar dados de verdade fora daqui — baixe o HTML e abra direto no navegador, ou publique num link (ex: GitHub Pages, como o outro dashboard seu).`
+      : '';
+    app.innerHTML = `<div class="errbox">Não consegui ler essa aba.<br><br>${e.message}${dicaSandbox}<br><br>${
+      e.dump
+        ? `Conteúdo cru das primeiras linhas (manda um print disso):<br><pre style="text-align:left;white-space:pre-wrap;font-size:10px;background:var(--fill);padding:10px;border-radius:10px;margin-top:8px">${e.dump}</pre>`
+        : (dentroDeIframe ? '' : 'Confere se a planilha está compartilhada como "Qualquer pessoa com o link → Leitor".')
+    }</div>`;
   }
 }
 
-carregar(localStorage.getItem('metas_pessoa') || '5_SDR');
+/* ============ PERSISTÊNCIA da pessoa selecionada ============
+   Tenta window.storage (funciona dentro do preview do Claude); se não
+   existir, cai pro localStorage normal (funciona quando hospedado fora,
+   ex: GitHub Pages). Nunca usa os dois ao mesmo tempo. */
+async function pessoaSalva(){
+  try{
+    if (window.storage){
+      const r = await window.storage.get('metas_pessoa_selecionada', false);
+      return (r && r.value) ? r.value : null;
+    }
+  }catch(e){ /* chave ainda não existe ou storage indisponível */ }
+  try{
+    return localStorage.getItem('metas_pessoa_selecionada');
+  }catch(e){
+    return null;
+  }
+}
+async function salvarPessoa(tab){
+  try{
+    if (window.storage){ await window.storage.set('metas_pessoa_selecionada', tab, false); return; }
+  }catch(e){ /* segue tentando o fallback */ }
+  try{ localStorage.setItem('metas_pessoa_selecionada', tab); }catch(e){ /* sem persistência disponível */ }
+}
+
+/* ============ INÍCIO ============ */
+(async function iniciar(){
+  const salvo = await pessoaSalva();
+  carregar(salvo || '5_SDR');
+})();
 </script>
 </body>
 </html>
