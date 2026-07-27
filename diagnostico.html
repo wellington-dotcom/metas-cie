@@ -118,28 +118,45 @@ function parseAbaIndividual(table){
   const cell=(r,c)=>(rows[r]&&rows[r].c[c])?rows[r].c[c]:null;
   const val=(r,c)=>{const x=cell(r,c);return x?(x.f??x.v??''):''};
   const rawnum=(r,c)=>{const x=cell(r,c);if(!x)return null;const n=typeof x.v==='number'?x.v:parseFloat(String(x.v).replace(',','.'));return isNaN(n)?null:n};
-  let headerRow=-1,colDia=-1;
-  const limiteBusca = Math.min(rows.length,30);
-  for(let r=0;r<limiteBusca;r++){for(let c=0;c<C;c++){if(norm(val(r,c))==='dia'){headerRow=r;colDia=c;break}}if(headerRow>=0)break}
-  if(headerRow<0){
-    // não achou — monta um dump das primeiras linhas pra diagnosticar sem precisar de outra rodada
-    const dump = [];
-    for(let r=0;r<Math.min(rows.length,20);r++){
-      const linha = [];
-      for(let c=0;c<Math.min(C,10);c++) linha.push(val(r,c) || '·');
-      dump.push(`L${r}: ${linha.join(' | ')}`);
-    }
-    const err = new Error('Cabeçalho "Dia" não encontrado nessa aba');
-    err.dump = dump.join('\n');
-    throw err;
-  }
+  // O Google às vezes detecta sozinho a 1ª linha como cabeçalho e já tira ela
+  // de "rows" (o texto vira table.cols[].label); outras vezes não detecta e
+  // o cabeçalho continua sendo a 1ª linha normal dentro de "rows". Cobrimos
+  // os dois casos.
+  let colDia=-1, dataStartRow=0;
   const headerMap={};
-  for(let c=colDia;c<C;c++){const t=norm(val(headerRow,c));if(t)headerMap[t]=c}
+  const colLabelsNorm = table.cols.map(c => norm(c.label));
+  const idxDiaNoLabel = colLabelsNorm.findIndex(l => l==='dia');
+
+  if(idxDiaNoLabel >= 0){
+    // Caso 1: cabeçalho já veio como rótulo de coluna — dados começam em rows[0]
+    colDia = idxDiaNoLabel;
+    for(let c=colDia;c<C;c++){ if(colLabelsNorm[c]) headerMap[colLabelsNorm[c]]=c; }
+    dataStartRow = 0;
+  } else {
+    // Caso 2: cabeçalho é uma linha normal dentro de "rows" — procura o texto "Dia"
+    let headerRow=-1;
+    const limiteBusca = Math.min(rows.length,30);
+    for(let r=0;r<limiteBusca;r++){for(let c=0;c<C;c++){if(norm(val(r,c))==='dia'){headerRow=r;colDia=c;break}}if(headerRow>=0)break}
+    if(headerRow<0){
+      // não achou de nenhum jeito — monta um dump das primeiras linhas pra diagnosticar
+      const dump = [];
+      for(let r=0;r<Math.min(rows.length,20);r++){
+        const linha = [];
+        for(let c=0;c<Math.min(C,10);c++) linha.push(val(r,c) || '·');
+        dump.push(`L${r}: ${linha.join(' | ')}`);
+      }
+      const err = new Error('Cabeçalho "Dia" não encontrado nessa aba (nem nos títulos das colunas, nem no conteúdo)');
+      err.dump = dump.join('\n');
+      throw err;
+    }
+    for(let c=colDia;c<C;c++){const t=norm(val(headerRow,c));if(t)headerMap[t]=c}
+    dataStartRow = headerRow+1;
+  }
   const colData=headerMap['data'], colFaltou=headerMap['faltou?'], colMetaDia=headerMap['meta dia'],
         colAcum=headerMap['acum. semana'], colSemana=headerMap['semana'];
   const colMetrica = colAcum!=null ? colAcum-1 : null;
   const dias=[];
-  for(let r=headerRow+1;r<rows.length;r++){
+  for(let r=dataStartRow;r<rows.length;r++){
     const dv=val(r,colDia); if(dv===''||dv==null) break;
     dias.push({dia:rawnum(r,colDia),data:val(r,colData),semana:colSemana!=null?rawnum(r,colSemana):null,
       realizado:colMetrica!=null?rawnum(r,colMetrica):null,acumSemana:colAcum!=null?rawnum(r,colAcum):null,
