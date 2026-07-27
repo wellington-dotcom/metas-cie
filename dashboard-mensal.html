@@ -4,7 +4,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <meta name="theme-color" content="#f3f4f9">
-<title>Dashboard Mensal - Visão da Gestão</title>
+<title>Dashboard de Metas e Bônus</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
@@ -21,6 +21,9 @@
     border:1px solid rgba(255,255,255,.8)}
   .progress-ring-circle{transition:stroke-dashoffset .8s cubic-bezier(.16,1,.3,1);
     transform:rotate(-90deg);transform-origin:50% 50%}
+  .no-scrollbar::-webkit-scrollbar{display:none}
+  .week-locked{filter:grayscale(.15)}
+  select.pessoa-select{font-family:'Inter',sans-serif}
 </style>
 </head>
 <body class="p-4 md:p-8">
@@ -28,17 +31,186 @@
 <div class="bg-shape bottom-20 right-[-5%] w-80 h-80 bg-orange-400 rounded-full"></div>
 
 <div class="max-w-6xl mx-auto space-y-6" id="app">
-  <div class="soft-card p-10 text-center text-gray-500">Carregando o mês…</div>
+  <div class="soft-card p-10 text-center text-gray-500">Carregando seus números…</div>
 </div>
 
 <script>
-/* ============ CONFIG ============ */
+/* ================= CONFIG + PARSER + FETCH (testados, sem alteração) ================= */
 const SHEET_ID = '1kFVP2oocRi0zsofaK9BihRbnpCo_nyM0R28wARnQu1A';
-const TAB = '2_Dashboard_Mensal';
+const ABAS = [
+  {tab:'5_SDR', nome:'Rayana'},
+  {tab:'4_Marketing', nome:'Gabrielly'},
+  {tab:'6_Closer', nome:'Isadora'},
+  {tab:'7_Recepção', nome:'Ludimila'},
+  {tab:'8_Auxiliar', nome:'Nauane'},
+  {tab:'09_Suporte', nome:'Tereza'},
+  {tab:'9_Haniely', nome:'Haniely'},
+];
 
 function norm(s){ return String(s??'').trim().toLowerCase(); }
+function parseAbaIndividual(table){
+  const rows = table.rows, C = table.cols.length;
+  const cell=(r,c)=>(rows[r]&&rows[r].c[c])?rows[r].c[c]:null;
+  const val=(r,c)=>{const x=cell(r,c);return x?(x.f??x.v??''):''};
+  const rawnum=(r,c)=>{const x=cell(r,c);if(!x)return null;const n=typeof x.v==='number'?x.v:parseFloat(String(x.v).replace(',','.'));return isNaN(n)?null:n};
+  const colLabelsNorm = table.cols.map(c=>norm(c.label));
 
-/* ============ FETCH ============ */
+  /* ---- 1. coluna "Data" e início dos dados ----
+     Em abas com linhas de título antes do cabeçalho real (ex: "ISADORA —
+     ACOMPANHAMENTO DIÁRIO"), o Google pode não conseguir promover NADA a
+     cabeçalho — e aí qualquer texto solto ("Dia","Data","Semana"...) cai
+     dentro de colunas cujo tipo é number/date e é DESCARTADO (mesmo motivo
+     do Dashboard Mensal). Por isso não confiamos no texto: usamos o TIPO
+     de cada coluna (table.cols[c].type), que o Google sempre preserva,
+     não importa o que aconteça com o cabeçalho. A coluna "Data" é sempre
+     a primeira do tipo "date"; "Dia" é sempre a coluna logo antes dela. */
+  let colDia=-1, colData=-1, dataStartRow=0;
+  for(let c=1;c<C;c++){ if(table.cols[c].type==='date'){ colData=c; break; } }
+
+  if(colData>=0){
+    colDia = colData-1;
+    // acha a 1ª linha que já tem um número de verdade na coluna "Dia"
+    // (pula título/subtítulo/cabeçalho, sejam eles quais forem)
+    let achou=false;
+    for(let r=0;r<Math.min(rows.length,40);r++){
+      if(rawnum(r,colDia)!=null){ dataStartRow=r; achou=true; break; }
+    }
+    if(!achou) colDia=-1; // não achou nenhuma linha de dado -> cai no fallback
+  }
+
+  const headerMap = {};
+  if(colDia<0){
+    /* fallback: abas mais simples, onde o texto do cabeçalho sobrevive
+       (promovido a table.cols[].label, ou como linha normal em "rows"). */
+    const colDataAuto = colLabelsNorm.findIndex(l=>l==='data');
+    if(colDataAuto>=0){
+      for(let c=0;c<C;c++){ if(colLabelsNorm[c]) headerMap[colLabelsNorm[c]]=c; }
+      colDia = colDataAuto-1;
+      dataStartRow = 0;
+    }else{
+      let headerRow=-1;
+      const limiteBusca = Math.min(rows.length,30);
+      for(let r=0;r<limiteBusca;r++){for(let c=0;c<C;c++){if(norm(val(r,c))==='dia'){headerRow=r;colDia=c;break}}if(headerRow>=0)break}
+      if(headerRow<0){
+        const dump = [];
+        dump.push('--- table.cols (rótulos e tipos crus) ---');
+        table.cols.forEach((c,i)=>{ dump.push(`col ${i}: label=${JSON.stringify(c.label)} type=${c.type}`); });
+        dump.push('');
+        dump.push('--- primeiras linhas de table.rows ---');
+        for(let r=0;r<Math.min(rows.length,20);r++){
+          const linha = [];
+          for(let c=0;c<Math.min(C,16);c++) linha.push(val(r,c) || '·');
+          dump.push(`L${r}: ${linha.join(' | ')}`);
+        }
+        const err = new Error('Cabeçalho "Dia" não encontrado nessa aba (nem pelo tipo da coluna, nem pelos títulos, nem pelo conteúdo)');
+        err.dump = dump.join('\n');
+        throw err;
+      }
+      for(let c=colDia;c<C;c++){const t=norm(val(headerRow,c));if(t)headerMap[t]=c}
+      dataStartRow = headerRow+1;
+    }
+  }
+
+  /* ---- 2. Semana, Acum., Faltou?, Meta dia ----
+     "Dia, Data, Dia sem., Semana" vêm sempre nessa ordem fixa nesse
+     modelo de planilha. Já a coluna acumulada muda de nome E de posição
+     (o número de colunas de métrica varia por função), então achamos ela
+     pelo COMPORTAMENTO dos valores: é a primeira coluna, depois de
+     "Semana", cujos números só sobem (ou empatam) dentro de cada semana e
+     reiniciam quando a semana muda — isso não depende de nome nenhum. */
+  const colSemana = colDia+3;
+  function acharColAcum(){
+    for(let cand=colSemana+1; cand<C; cand++){
+      let ok=true, testouAlgo=false, anterior=null, semanaAnterior;
+      for(let r=dataStartRow;r<rows.length;r++){
+        const dv=rawnum(r,colDia); if(dv==null) break;
+        const semAtual = rawnum(r,colSemana);
+        if(semAtual!==semanaAnterior){ anterior=null; semanaAnterior=semAtual; }
+        const v = rawnum(r,cand);
+        if(v==null) continue;
+        testouAlgo=true;
+        if(anterior!=null && v<anterior-0.01){ ok=false; break; }
+        anterior=v;
+      }
+      if(ok && testouAlgo) return cand;
+    }
+    return null;
+  }
+  const colAcum = headerMap['acum. semana'] ?? acharColAcum();
+  const colFaltou = headerMap['faltou?'] ?? (colAcum!=null ? colAcum+1 : null);
+  const colMetaDia = headerMap['meta dia'] ?? (colAcum!=null ? colAcum+2 : null);
+  const colData_ = headerMap['data'] ?? colData;
+
+  /* A coluna com o valor realizado do dia muda de nome (e de posição) pra
+     cada função — "Pacientes com presença", "Propostas", "Leads gerados"
+     etc. Em vez de supor uma posição fixa, TESTAMOS: soma cada coluna
+     candidata dentro da semana e vemos qual delas realmente reproduz os
+     valores de "Acum." — essa é a métrica de verdade. */
+  function acharColMetrica(){
+    if(colAcum==null || colDia==null) return null;
+    for(let cand=colAcum-1; cand>colSemana; cand--){
+      let acumCalc=0, semanaAnterior, bateu=true, testouAlgo=false;
+      for(let r=dataStartRow;r<rows.length;r++){
+        const dv=val(r,colDia); if(dv===''||dv==null) break;
+        const semAtual = colSemana!=null?rawnum(r,colSemana):null;
+        if(semAtual!==semanaAnterior){ acumCalc=0; semanaAnterior=semAtual; }
+        const valCand = rawnum(r,cand)||0;
+        acumCalc += valCand;
+        const valAcumReal = rawnum(r,colAcum);
+        if(valAcumReal==null) continue;
+        testouAlgo=true;
+        if(Math.abs(acumCalc-valAcumReal)>0.05){ bateu=false; break; }
+      }
+      if(bateu && testouAlgo) return cand;
+    }
+    return colAcum!=null ? colAcum-1 : null;
+  }
+  const colMetrica = acharColMetrica();
+  const dias=[];
+  for(let r=dataStartRow;r<rows.length;r++){
+    const dv=val(r,colDia); if(dv===''||dv==null) break;
+    dias.push({dia:rawnum(r,colDia),data:val(r,colData_),semana:colSemana!=null?rawnum(r,colSemana):null,
+      realizado:colMetrica!=null?rawnum(r,colMetrica):null,acumSemana:colAcum!=null?rawnum(r,colAcum):null,
+      faltou:colFaltou!=null?(norm(val(r,colFaltou))==='sim'||norm(val(r,colFaltou))==='x'):false,
+      metaDia:colMetaDia!=null?rawnum(r,colMetaDia):null});
+  }
+
+  /* ---- 3. bloco RESUMO DO MÊS ----
+     Essa coluna é sempre texto (rótulos como "Meta mensal", mensagens
+     etc.), então o nome dela sobrevive normalmente — mantemos a busca por
+     texto aqui, primeiro nos rótulos de coluna, depois nas linhas. */
+  let resumoCol=-1, resumoStartRow=0;
+  const colResumoAuto = colLabelsNorm.findIndex(l=>l.includes('resumo do mês'));
+  if(colResumoAuto>=0){
+    resumoCol = colResumoAuto;
+    resumoStartRow = 0;
+  }else{
+    let resumoRow=-1;
+    for(let r=0;r<rows.length;r++){for(let c=0;c<C;c++){if(norm(val(r,c)).includes('resumo do mês')){resumoRow=r;resumoCol=c;break}}if(resumoRow>=0)break}
+    if(resumoRow<0) throw new Error('Bloco "RESUMO DO MÊS" não encontrado nessa aba (nem nos títulos das colunas, nem no conteúdo)');
+    resumoStartRow = resumoRow+1;
+  }
+  const resumo={semanas:{}}; let mensagem='';
+  for(let r=resumoStartRow;r<rows.length;r++){
+    const label=norm(val(r,resumoCol)); const valor=val(r,resumoCol+1); const valor2=val(r,resumoCol+2);
+    if(!label) continue;
+    if(label==='meta mensal') resumo.metaMensal=rawnum(r,resumoCol+1);
+    else if(label==='realizado (até hoje)') resumo.realizadoAteHoje=rawnum(r,resumoCol+1);
+    else if(label==='realizado total no mês') resumo.realizadoTotal=rawnum(r,resumoCol+1);
+    else if(label==='% atingido') resumo.pctAtingido=valor;
+    else if(label==='projeção do mês (no ritmo)') resumo.projecao=rawnum(r,resumoCol+1);
+    else if(label==='projeção / meta') resumo.pctProjecao=valor;
+    else if(label==='total de faltas no mês') resumo.faltas=rawnum(r,resumoCol+1);
+    else if(label==='desconto sobre o total') resumo.desconto=valor;
+    else if(/^semana [1-5]$/.test(label)){ const n=label.split(' ')[1]; resumo.semanas[n]={bonus:valor,realMeta:valor2} }
+    else if(label.includes('subtotal base')) resumo.bonusBase=valor;
+    else if(label.includes('bônus extra')) resumo.bonusExtra=valor;
+    else if(label.includes('total possível')) resumo.bonusTotal=valor;
+    else if(!valor && label.length>15 && !mensagem) mensagem=val(r,resumoCol);
+  }
+  resumo.mensagem=mensagem;
+  return {dias,resumo};
+}
 async function buscarAba(tab){
   const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(tab)}`;
   const res = await fetch(url);
@@ -49,130 +221,90 @@ async function buscarAba(tab){
   return data.table;
 }
 
-/* ============ ACHAR COLUNA "PESSOA" ============
-   O Google atribui UM tipo por coluna (baseado na maioria dos dados dela).
-   Nas colunas de número (Meta mês, Realizado, Bônus apurado...) qualquer
-   texto que caia ali é DESCARTADO — só sobrevivem como texto as colunas
-   que são texto o tempo todo (Pessoa, Status, Mensagem). Por isso achamos
-   "Pessoa" e usamos posição relativa a ela pra tudo o mais. */
-function acharColPessoa(table){
-  const rows = table.rows, C = table.cols.length;
-  const val=(r,c)=>{const x=rows[r]&&rows[r].c[c];return x?(x.f??x.v??''):''};
-  const colLabelsNorm = table.cols.map(c => norm(c.label));
+/* Bônus já GANHO de verdade (com desconto de falta já aplicado) vem do
+   Dashboard Mensal, coluna "Bônus apurado" — não confundir com o "Subtotal
+   base" da aba individual, que soma o valor ALVO de cada semana mesmo pras
+   que ainda não terminaram (a planilha só conta o bônus quando a semana
+   encerra). Falha graciosamente: se der errado, devolve null e a tela
+   principal continua funcionando normalmente.
 
-  let colPessoa = colLabelsNorm.findIndex(l => l==='pessoa');
-  if(colPessoa>=0) return {colPessoa, dataStartRow:0};
+   Descoberta na prática: o Google atribui UM tipo por coluna (baseado na
+   maioria dos dados dela). Nas colunas de número (Meta mês, Realizado,
+   Bônus apurado...) o próprio texto do cabeçalho é DESCARTADO — não
+   sobrevive em lugar nenhum da resposta, só nas colunas que são texto o
+   tempo todo (Pessoa, Status, Mensagem). Por isso não dá pra procurar o
+   texto "Bônus apurado" — usamos posição relativa à coluna "Pessoa"
+   (Bônus apurado é sempre a 7ª coluna depois de Pessoa nessa planilha). */
+async function buscarBonusApurado(nomePessoa){
+  try{
+    const table = await buscarAba('2_Dashboard_Mensal');
+    const rows = table.rows, C = table.cols.length;
+    const cell=(r,c)=>(rows[r]&&rows[r].c[c])?rows[r].c[c]:null;
+    const val=(r,c)=>{const x=cell(r,c);return x?(x.f??x.v??''):''};
+    const colLabelsNorm = table.cols.map(c=>norm(c.label));
 
-  const limite = Math.min(rows.length,40);
-  for(let r=0;r<limite;r++){
-    for(let c=0;c<C;c++){ if(norm(val(r,c))==='pessoa'){ return {colPessoa:c, dataStartRow:r+1}; } }
-  }
-  colPessoa = colLabelsNorm.findIndex(l => l.includes('pessoa'));
-  if(colPessoa>=0) return {colPessoa, dataStartRow:0};
-  for(let r=0;r<limite;r++){
-    for(let c=0;c<C;c++){ if(norm(val(r,c)).includes('pessoa')){ return {colPessoa:c, dataStartRow:r+1}; } }
-  }
-  return null;
-}
-
-function montarDump(table){
-  const rows = table.rows, C = table.cols.length;
-  const val=(r,c)=>{const x=rows[r]&&rows[r].c[c];return x?(x.f??x.v??''):''};
-  const dump = [];
-  dump.push('--- table.cols (rótulos de coluna crus) ---');
-  table.cols.forEach((c,i)=>{ dump.push(`col ${i}: id="${c.id}" label=${JSON.stringify(c.label)} type=${c.type}`); });
-  dump.push('');
-  dump.push('--- primeiras linhas de table.rows ---');
-  for(let r=0;r<Math.min(rows.length,25);r++){
-    const linha = [];
-    for(let c=0;c<Math.min(C,14);c++) linha.push(val(r,c) || '·');
-    dump.push(`L${r}: ${linha.join(' | ')}`);
-  }
-  return dump.join('\n');
-}
-
-/* ============ PARSER ============
-   Estrutura fixa da planilha: a partir da coluna "Pessoa" — Meta mês,
-   Realizado, % atingido, Projeção, % projeção, Status, Bônus apurado,
-   Faltas, Penalidade, A ser Pago, Bônus máximo, Mensagem. */
-function parseMensal(table){
-  const rows = table.rows;
-  const cell=(r,c)=>(rows[r]&&rows[r].c[c])?rows[r].c[c]:null;
-  const val=(r,c)=>{const x=cell(r,c);return x?(x.f??x.v??''):''};
-  const rawnum=(r,c)=>{const x=cell(r,c);if(!x)return null;const n=typeof x.v==='number'?x.v:parseFloat(String(x.v).replace(',','.'));return isNaN(n)?null:n};
-
-  const ancora = acharColPessoa(table);
-  if(!ancora){
-    const err = new Error('Cabeçalho "Pessoa" não encontrado nessa aba (nem nos títulos das colunas, nem no conteúdo)');
-    err.dump = montarDump(table);
-    throw err;
-  }
-  const {colPessoa, dataStartRow} = ancora;
-  const colMeta=colPessoa+1, colReal=colPessoa+2, colPct=colPessoa+3, colProj=colPessoa+4,
-        colPctProj=colPessoa+5, colStatus=colPessoa+6, colBonusApurado=colPessoa+7,
-        colFaltas=colPessoa+8, colPenalidade=colPessoa+9, colASerPago=colPessoa+10,
-        colBonusMax=colPessoa+11, colMsg=colPessoa+12;
-
-  const pessoas = [];
-  let totalASerPago = null;
-  let linhaVisaoGeral = -1;
-  for(let r=0;r<dataStartRow;r++){
-    if(norm(val(r,colPessoa))==='mês'){ linhaVisaoGeral = r; break; }
-  }
-  for(let r=dataStartRow;r<rows.length;r++){
-    const nome = val(r,colPessoa);
-    if(nome===''||nome==null) break;
-    if(norm(nome)==='total'){
-      totalASerPago = val(r,colASerPago) || null;
-      continue;
+    let colPessoa=-1, dataStartRow=0;
+    colPessoa = colLabelsNorm.findIndex(l=>l==='pessoa');
+    if(colPessoa<0){
+      const limite=Math.min(rows.length,40);
+      for(let r=0;r<limite;r++){for(let c=0;c<C;c++){if(norm(val(r,c))==='pessoa'){dataStartRow=r+1;colPessoa=c;break}}if(colPessoa>=0)break}
     }
-    pessoas.push({
-      nome,
-      meta: val(r,colMeta), realizado: val(r,colReal),
-      pct: val(r,colPct)||null, pctNum: rawnum(r,colPct),
-      projecao: val(r,colProj), pctProjecao: val(r,colPctProj)||null,
-      status: val(r,colStatus),
-      bonusApurado: val(r,colBonusApurado)||null,
-      faltas: rawnum(r,colFaltas),
-      penalidade: val(r,colPenalidade)||null,
-      aSerPago: val(r,colASerPago)||null,
-      bonusMax: val(r,colBonusMax)||null,
-      mensagem: val(r,colMsg)
-    });
-  }
+    if(colPessoa<0) colPessoa = colLabelsNorm.findIndex(l=>l.includes('pessoa'));
+    if(colPessoa<0){
+      const limite=Math.min(rows.length,40);
+      for(let r=0;r<limite;r++){for(let c=0;c<C;c++){if(norm(val(r,c)).includes('pessoa')){dataStartRow=r+1;colPessoa=c;break}}if(colPessoa>=0)break}
+    }
+    if(colPessoa<0) return {valor:null, erro:'coluna "Pessoa" não encontrada de nenhuma forma (exata ou aproximada)'};
 
-  const visaoGeral = {
-    pctDecorrido: linhaVisaoGeral>=0 ? (val(linhaVisaoGeral,colPct)||null) : null,
-    faturamentoMeta: linhaVisaoGeral>=0 ? (val(linhaVisaoGeral,colPctProj)||null) : null,
-    bonusTotalPossivel: linhaVisaoGeral>=0 ? (val(linhaVisaoGeral,colBonusApurado)||null) : null,
-    totalApurado: linhaVisaoGeral>=0 ? (val(linhaVisaoGeral,colBonusMax)||null) : null,
-    totalASerPago
-  };
-
-  return {visaoGeral, pessoas};
+    const colBonusApurado = colPessoa+7;
+    for(let r=dataStartRow;r<rows.length;r++){
+      const nome = val(r,colPessoa);
+      if(nome===''||nome==null) break;
+      if(norm(nome)===norm(nomePessoa)) return {valor: val(r,colBonusApurado), erro:null};
+    }
+    return {valor:null, erro:`pessoa "${nomePessoa}" não encontrada na coluna Pessoa`};
+  }catch(e){ return {valor:null, erro:'exceção: '+e.message}; }
 }
-
-function mesAtualExtenso(){
-  const meses = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
-  const d = new Date();
-  return meses[d.getMonth()] + '/' + d.getFullYear();
-}
-
-/* ============ mesma paleta/ícones da página Individual ============ */
-function statusDe(status){
-  if((status||'').includes('🟢')) return {cor:'emerald', hex:'#10b981', bg:'#d1fae5', ink:'#047857'};
-  if((status||'').includes('🔴')) return {cor:'red', hex:'#ef4444', bg:'#fee2e2', ink:'#b91c1c'};
+function statusDe(mensagem){
+  if((mensagem||'').includes('🟢')) return {cor:'emerald', hex:'#10b981', bg:'#d1fae5', ink:'#047857'};
+  if((mensagem||'').includes('🔴')) return {cor:'red', hex:'#ef4444', bg:'#fee2e2', ink:'#b91c1c'};
   return {cor:'amber', hex:'#f59e0b', bg:'#fef3c7', ink:'#b45309'};
 }
-const ICONE_CHECK = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round" stroke-width="3"/></svg>`;
-const ICONE_X = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" stroke-linecap="round" stroke-linejoin="round" stroke-width="3"/></svg>`;
-const ICONE_ANDAMENTO = `<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M13.492 10.39c-1.381 0-2.5 1.119-2.5 2.5s1.119 2.5 2.5 2.5 2.5-1.119 2.5-2.5-1.119-2.5-2.5-2.5zm.008 4c-.827 0-1.5-.673-1.5-1.5s.673-1.5 1.5-1.5 1.5.673 1.5 1.5-.673 1.5-1.5 1.5z"/><path d="M19.03 12c0-3.059-2.471-5.53-5.53-5.53s-5.53 2.471-5.53 5.53c0 1.488.587 2.84 1.543 3.844l-1.493 1.493C6.772 16.035 6 14.108 6 12c0-4.411 3.589-8 8-8s8 3.589 8 8c0 2.108-.772 4.035-2.02 5.337l-1.493-1.493c.956-1.004 1.543-2.356 1.543-3.844z"/></svg>`;
-function iconeDe(status){
-  if((status||'').includes('🟢')) return ICONE_CHECK;
-  if((status||'').includes('🔴')) return ICONE_X;
-  return ICONE_ANDAMENTO;
+function saudacao(){
+  const h = new Date().getHours();
+  if(h<12) return 'Bom dia';
+  if(h<18) return 'Boa tarde';
+  return 'Boa noite';
 }
-function svgRing(pct, corHex, size=52, stroke=5){
+
+/* ================= HELPERS NOVOS (visual Stitch) ================= */
+function parseDataBR(s){
+  if(!s) return null;
+  const [d,m,y] = String(s).split('/').map(Number);
+  if(!d||!m) return null;
+  const ano = y ? (y<100?2000+y:y) : new Date().getFullYear();
+  return new Date(ano, m-1, d);
+}
+function diasNoMes(date){ return new Date(date.getFullYear(), date.getMonth()+1, 0).getDate(); }
+function parseRealMeta(s){
+  if(!s) return null;
+  const partes = String(s).split('/').map(x=>parseFloat(String(x).trim().replace(',','.')));
+  if(partes.length!==2 || isNaN(partes[0]) || isNaN(partes[1])) return null;
+  return {real:partes[0], meta:partes[1]};
+}
+/* acha o dia de "hoje" comparando a data real do calendário com as datas da
+   planilha — não pode assumir que a última linha é hoje, porque a planilha
+   já vem preenchida (com zero) até o fim do mês inteiro. */
+function acharHoje(dias, agora){
+  agora = agora || new Date();
+  const achado = dias.find(d=>{
+    const dt = parseDataBR(d.data);
+    return dt && dt.getDate()===agora.getDate() && dt.getMonth()===agora.getMonth() && dt.getFullYear()===agora.getFullYear();
+  });
+  return achado || dias[dias.length-1] || null;
+}
+
+function svgRing(pct, corHex, size=64, stroke=6){
   const r = (size/2)-stroke;
   const C = 2*Math.PI*r;
   const off = C - Math.max(0,Math.min(pct,1))*C;
@@ -184,119 +316,213 @@ function svgRing(pct, corHex, size=52, stroke=5){
   </svg>`;
 }
 
-/* ============ CARD DE PESSOA ============ */
-function cardPessoa(p){
-  const st = statusDe(p.status);
-  return `
-  <div class="soft-card p-6 flex flex-col">
-    <div class="flex items-center justify-between mb-5">
-      <h2 class="text-xl font-bold text-gray-800">${p.nome}</h2>
-      <div class="relative flex items-center justify-center flex-shrink-0">
-        ${svgRing(p.pctNum||0, st.hex)}
-        <span class="absolute text-[10px] font-bold text-gray-700">${p.pct||''}</span>
-      </div>
-    </div>
-    <div class="grid grid-cols-3 gap-2 text-center mb-5">
-      <div><p class="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">Meta</p><p class="font-bold text-gray-800">${p.meta ?? '—'}</p></div>
-      <div><p class="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">Realizado</p><p class="font-bold text-gray-800">${p.realizado ?? '—'}</p></div>
-      <div><p class="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">Projeção</p><p class="font-bold text-gray-800">${p.projecao ?? '—'}</p></div>
-    </div>
-    <div class="grid grid-cols-3 gap-2 mb-4">
-      <div class="text-center">
-        <p class="text-[9px] font-bold text-gray-400 uppercase mb-1">Apurado</p>
-        <div class="bg-violet-50 rounded-xl py-2.5 font-bold text-gray-800 text-sm">${p.bonusApurado ?? '—'}</div>
-      </div>
-      <div class="text-center">
-        <p class="text-[9px] font-bold text-gray-400 uppercase mb-1">A Pagar</p>
-        <div class="bg-orange-50 rounded-xl py-2.5 font-bold text-gray-800 text-sm">${p.aSerPago || 'R$ 0'}</div>
-      </div>
-      <div class="text-center">
-        <p class="text-[9px] font-bold text-gray-400 uppercase mb-1">Máximo</p>
-        <div class="bg-violet-50 rounded-xl py-2.5 font-bold text-gray-800 text-sm">${p.bonusMax ?? '—'}</div>
-      </div>
-    </div>
-    ${p.faltas ? `<div class="text-xs font-bold text-red-600 bg-red-50 rounded-lg py-2 px-3 text-center mb-3">⚠️ ${p.faltas} falta(s) no mês — desconto de ${p.penalidade||'—'}</div>` : ''}
-    <div class="rounded-xl px-4 py-3 flex items-center gap-3 mt-auto" style="background:${st.bg}">
-      <div class="rounded-full w-7 h-7 flex items-center justify-center text-white flex-shrink-0" style="background:${st.hex}">${iconeDe(p.status)}</div>
-      <p class="text-sm font-semibold" style="color:${st.ink}">${p.mensagem || ''}</p>
-    </div>
-  </div>`;
-}
+const ICONE_CHECK = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round" stroke-width="3"/></svg>`;
+const ICONE_ANDAMENTO = `<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M13.492 10.39c-1.381 0-2.5 1.119-2.5 2.5s1.119 2.5 2.5 2.5 2.5-1.119 2.5-2.5-1.119-2.5-2.5-2.5zm.008 4c-.827 0-1.5-.673-1.5-1.5s.673-1.5 1.5-1.5 1.5.673 1.5 1.5-.673 1.5-1.5 1.5z"/><path d="M19.03 12c0-3.059-2.471-5.53-5.53-5.53s-5.53 2.471-5.53 5.53c0 1.488.587 2.84 1.543 3.844l-1.493 1.493C6.772 16.035 6 14.108 6 12c0-4.411 3.589-8 8-8s8 3.589 8 8c0 2.108-.772 4.035-2.02 5.337l-1.493-1.493c.956-1.004 1.543-2.356 1.543-3.844z"/></svg>`;
+const ICONE_CADEADO = `<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" clip-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"/></svg>`;
 
-/* ============ RENDER ============ */
-function render(dados){
-  const {visaoGeral, pessoas} = dados;
+const ICONE_X = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" stroke-linecap="round" stroke-linejoin="round" stroke-width="3"/></svg>`;
+
+/* ================= RENDER ================= */
+function render(pessoa, parsed, bonusApurado, erroBonus){
+  const {dias, resumo} = parsed;
+  const st = statusDe(resumo.mensagem);
+  const pctNum = resumo.metaMensal ? resumo.realizadoTotal/resumo.metaMensal : 0;
+  const pctLabel = resumo.pctAtingido || Math.round(pctNum*100)+'%';
+
+  const hoje = acharHoje(dias);
+  const hojeData = hoje ? parseDataBR(hoje.data) : null;
+  const totalDiasMes = hojeData ? diasNoMes(hojeData) : null;
+  const diasRestantes = (hoje && totalDiasMes) ? Math.max(0, totalDiasMes - hoje.dia) : null;
+  const pctMesDecorrido = (hoje && totalDiasMes) ? hoje.dia/totalDiasMes : 0;
+
+  const semanaAtualNum = hoje ? hoje.semana : null;
+
+  // Jornada do bônus: status de cada semana (concluída batendo / concluída sem bater / em andamento / travada)
+  const semanasOrdenadas = ['1','2','3','4','5'].filter(n=>resumo.semanas[n]);
+  const jornadaHtml = semanasOrdenadas.map((n)=>{
+    const s = resumo.semanas[n];
+    const numSemana = parseInt(n,10);
+    const concluida = semanaAtualNum!=null && numSemana < semanaAtualNum;
+    const emAndamento = semanaAtualNum!=null && numSemana === semanaAtualNum;
+    if(concluida){
+      const rm = parseRealMeta(s.realMeta);
+      const bateu = rm ? rm.real >= rm.meta : true;
+      const cor = bateu ? 'bg-emerald-500' : 'bg-red-500';
+      const rotulo = bateu ? 'Concluída' : 'Não batida';
+      const icone = bateu ? ICONE_CHECK : ICONE_X;
+      return `<div class="relative z-10 flex flex-col items-center w-1/5 px-1">
+        <div class="${cor} rounded-2xl p-4 text-white text-center w-full shadow-lg mb-4">
+          <p class="text-xs opacity-90 font-semibold">Semana ${n}</p>
+          <p class="text-[10px] opacity-75 mb-2">${rotulo}</p>
+          <div class="bg-white/90 rounded-full w-8 h-8 flex items-center justify-center mx-auto mb-3" style="color:inherit">
+            <span class="${cor.replace('bg-','text-')}">${icone}</span>
+          </div>
+          <p class="text-xl font-bold">${s.bonus}</p>
+          <hr class="border-white/30 my-2"/>
+          <p class="text-[10px] font-medium">${s.realMeta||'—'} Meta</p>
+        </div>
+      </div>`;
+    }
+    if(emAndamento){
+      return `<div class="relative z-10 flex flex-col items-center w-1/5 px-1">
+        <div class="bg-amber-100 border-2 border-amber-400 rounded-2xl p-4 text-amber-700 text-center w-full shadow-xl mb-4 scale-105">
+          <p class="text-xs font-bold">Semana ${n}</p>
+          <p class="text-[10px] opacity-75 mb-2">Em andamento</p>
+          <div class="bg-amber-400 text-white rounded-full w-8 h-8 flex items-center justify-center mx-auto mb-3">${ICONE_ANDAMENTO}</div>
+          <p class="text-xl font-black text-gray-900">${s.bonus}</p>
+          <hr class="border-amber-300 my-2"/>
+          <p class="text-[10px] font-bold">${s.realMeta||'—'} Meta</p>
+        </div>
+      </div>`;
+    }
+    return `<div class="relative z-10 flex flex-col items-center w-1/5 px-1 week-locked">
+      <div class="bg-gray-200 rounded-2xl p-4 text-gray-500 text-center w-full mb-4">
+        <p class="text-xs font-semibold">Semana ${n}</p>
+        <p class="text-[10px] opacity-75 mb-2">A vir</p>
+        <div class="bg-gray-400 text-white rounded-full w-8 h-8 flex items-center justify-center mx-auto mb-3">${ICONE_CADEADO}</div>
+        <p class="text-xl font-bold text-gray-700">${s.bonus}</p>
+        <hr class="border-gray-300 my-2"/>
+        <p class="text-[10px]">alvo da semana</p>
+      </div>
+    </div>`;
+  }).join('');
+
+  // gráfico diário: barra por dia, cor por status daquele dia
+  const maxVal = Math.max(...dias.map(d=>d.realizado||0), 1);
+  const alturaPx = 180;
+  const porSemana = {};
+  dias.forEach(d=>{ (porSemana[d.semana]=porSemana[d.semana]||[]).push(d); });
+  const semanasDoGrafico = Object.keys(porSemana).sort((a,b)=>a-b);
+  const barrasHtml = semanasDoGrafico.map(sem=>{
+    const barrasDaSemana = porSemana[sem].map(d=>{
+      const h = maxVal ? Math.max(4, Math.round(((d.realizado||0)/maxVal)*alturaPx)) : 4;
+      const isHoje = d===hoje;
+      let cor = '#e5e7eb';
+      if(isHoje) cor='#7c3aed';
+      else if(d.metaDia!=null){ cor = (d.realizado||0) >= d.metaDia ? '#10b981' : '#fb923c'; }
+      /* posição/tamanho em CSS inline (não depende do Tailwind já ter processado as classes a tempo) */
+      return `<div style="display:flex;flex-direction:column;align-items:center">
+        <div style="position:relative;height:${alturaPx}px;width:12px">
+          <div style="position:absolute;bottom:0;left:0;width:100%;height:${h}px;background:${cor};border-radius:3px 3px 0 0"
+            title="Dia ${d.dia}: ${d.realizado!=null?Math.round(d.realizado):0} (meta: ${d.metaDia!=null?Math.round(d.metaDia):'—'})"></div>
+        </div>
+        <span class="mt-1 text-[9px] font-bold text-gray-400">${d.dia}</span>
+      </div>`;
+    }).join('');
+    return `<div class="flex flex-col items-center gap-2 px-3 border-r border-gray-100 last:border-r-0 flex-shrink-0">
+      <div style="display:flex;align-items:flex-end;gap:4px">${barrasDaSemana}</div>
+      <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wide whitespace-nowrap">Semana ${sem}</span>
+    </div>`;
+  }).join('');
+
   const app = document.getElementById('app');
   app.innerHTML = `
     <header class="rounded-xl shadow-lg mb-2 flex items-center justify-between px-4 py-3"
       style="background:linear-gradient(90deg,#8a3aff 0%,#ff7e00 100%)">
       <div>
-        <p class="text-white/80 text-xs font-semibold uppercase tracking-wide">Visão da gestão</p>
-        <p class="text-white text-lg font-extrabold leading-tight">Dashboard Mensal</p>
+        <p class="text-white/80 text-xs font-semibold uppercase tracking-wide">${saudacao()}</p>
+        <p class="text-white text-lg font-extrabold leading-tight">${pessoa.nome}</p>
       </div>
-      <div class="text-right">
-        <p class="text-white text-sm font-bold">${mesAtualExtenso()}</p>
-        ${visaoGeral.pctDecorrido ? `<p class="text-white/70 text-[11px] font-semibold">${visaoGeral.pctDecorrido} do mês decorrido</p>` : ''}
-      </div>
+      <select id="seletor" class="pessoa-select rounded-lg border-0 text-xs font-bold px-3 py-2 bg-white/90 text-gray-700">
+        ${ABAS.map(a=>`<option value="${a.tab}" ${a.tab===pessoa.tab?'selected':''}>${a.nome}</option>`).join('')}
+      </select>
     </header>
 
     <nav class="flex gap-2 flex-wrap px-1">
-      <a href="metas-index.html" class="text-xs font-bold px-3 py-2 rounded-full bg-gray-100 text-gray-600 hover:bg-violet-50">Individual</a>
-      <a href="dashboard-mensal.html" class="text-xs font-bold px-3 py-2 rounded-full bg-violet-600 text-white">Mensal</a>
+      <a href="metas-index.html" class="text-xs font-bold px-3 py-2 rounded-full bg-violet-600 text-white">Individual</a>
+      <a href="dashboard-mensal.html" class="text-xs font-bold px-3 py-2 rounded-full bg-gray-100 text-gray-600 hover:bg-violet-50">Mensal</a>
       <a href="dashboard-semanal.html" class="text-xs font-bold px-3 py-2 rounded-full bg-gray-100 text-gray-600 hover:bg-violet-50">Semanal</a>
     </nav>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-      <div class="soft-card p-6">
-        <h3 class="text-gray-700 font-bold text-sm mb-2">Faturamento Meta</h3>
-        <p class="text-3xl font-black text-gray-900">${visaoGeral.faturamentoMeta ?? '—'}</p>
+    ${resumo.mensagem ? `<div class="soft-card px-5 py-3 text-sm font-semibold" style="color:${st.ink};background:${st.bg}">${resumo.mensagem}</div>` : ''}
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div class="soft-card p-6 flex justify-between items-center">
+        <div>
+          <h3 class="text-gray-700 font-bold text-lg mb-2">Meta Atual</h3>
+          <p class="text-2xl font-black text-gray-900">${resumo.realizadoTotal!=null?Math.round(resumo.realizadoTotal):'—'}<span class="text-sm font-semibold text-gray-400"> / ${resumo.metaMensal!=null?Math.round(resumo.metaMensal):'—'}</span></p>
+        </div>
+        <div class="relative flex items-center justify-center">
+          ${svgRing(pctNum, st.hex, 64, 6)}
+          <span class="absolute text-sm font-bold text-gray-800">${pctLabel}</span>
+        </div>
       </div>
-      <div class="soft-card p-6">
-        <h3 class="text-gray-700 font-bold text-sm mb-2">Bônus Total Possível</h3>
-        <p class="text-3xl font-black text-gray-900">${visaoGeral.bonusTotalPossivel ?? '—'}</p>
+      <div class="soft-card p-6 flex flex-col items-center justify-center text-center">
+        <h3 class="text-gray-700 font-bold text-lg">Bônus Acumulado</h3>
+        <p class="text-3xl font-extrabold text-gray-900 mt-1">${bonusApurado ?? '—'}</p>
+        <p class="text-[11px] text-gray-400 mt-1">já garantido (líquido de falta)</p>
+        ${erroBonus?`<p class="text-[9px] text-red-400 mt-1">debug: ${String(erroBonus).replace(/</g,'&lt;')}</p>`:''}
       </div>
-      <div class="soft-card p-6">
-        <h3 class="text-gray-700 font-bold text-sm mb-2">Total Apurado</h3>
-        <p class="text-3xl font-black text-violet-600">${visaoGeral.totalApurado ?? '—'}</p>
-      </div>
-      <div class="soft-card p-6">
-        <h3 class="text-gray-700 font-bold text-sm mb-2">Total a Pagar</h3>
-        <p class="text-3xl font-black text-gray-900">${visaoGeral.totalASerPago ?? '—'}</p>
+      <div class="soft-card p-6 flex flex-col items-center justify-center">
+        <h3 class="text-gray-700 font-bold text-lg mb-1">Dias Restantes</h3>
+        <p class="text-2xl font-black text-violet-600 mb-3">${diasRestantes ?? '—'}</p>
+        <div class="w-full h-3 bg-gray-100 rounded-full relative">
+          <div class="absolute left-0 top-0 h-full bg-purple-500 rounded-full" style="width:${Math.round(pctMesDecorrido*100)}%"></div>
+          <div class="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-purple-700 border-2 border-white rounded-full" style="left:calc(${Math.round(pctMesDecorrido*100)}% - 8px)"></div>
+        </div>
       </div>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      ${pessoas.map(cardPessoa).join('')}
+    <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      <div class="lg:col-span-1 soft-card p-8 flex flex-col items-center justify-center text-center">
+        <div class="mb-6"><span class="material-symbols-outlined text-5xl text-amber-400" style="font-size:48px">emoji_events</span></div>
+        <h3 class="text-xl font-bold text-gray-800 leading-tight">Bônus EXTRA</h3>
+        <p class="text-gray-500 text-sm mb-4">(se bater a meta do mês)</p>
+        <p class="text-4xl font-black text-gray-900">${resumo.bonusExtra ?? '—'}</p>
+      </div>
+      <div class="lg:col-span-3 soft-card p-8">
+        <h2 class="text-center text-2xl font-bold text-gray-800 mb-10">Jornada do Bônus Mensal</h2>
+        <div class="relative flex justify-between items-start">
+          <div class="absolute top-20 left-0 w-full h-1 bg-gray-200 -z-0"></div>
+          ${jornadaHtml}
+        </div>
+      </div>
     </div>
 
-    <div class="text-center text-xs text-gray-400 pb-4">Dados direto da planilha · "A pagar" já considera o desconto de faltas (se houver)</div>
+    <div class="soft-card p-8">
+      <h2 class="text-center text-2xl font-bold text-gray-800 mb-2">Acompanhamento Diário</h2>
+      <div class="flex justify-center gap-4 mb-6 text-[11px] font-semibold text-gray-500">
+        <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-emerald-500 inline-block"></span>Bateu a meta do dia</span>
+        <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-orange-400 inline-block"></span>Abaixo da meta</span>
+        <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-violet-600 inline-block"></span>Hoje</span>
+      </div>
+      <div class="relative w-full overflow-x-auto no-scrollbar">
+        <div class="flex items-start pb-2 border-b border-gray-200" style="min-width:min-content">
+          ${barrasHtml}
+        </div>
+      </div>
+    </div>
+
+    <div class="text-center text-xs text-gray-400 pb-4">Dados direto da planilha · pode levar alguns minutos pra atualizar</div>
   `;
+
+  document.getElementById('seletor').addEventListener('change', e=>{
+    localStorage.setItem('metas_pessoa', e.target.value);
+    carregar(e.target.value);
+  });
 }
 
-/* ============ CARREGAR ============ */
-async function carregar(){
+/* ================= CARREGAR ================= */
+async function carregar(tab){
   const app = document.getElementById('app');
-  app.innerHTML = '<div class="soft-card p-10 text-center text-gray-500">Carregando o mês…</div>';
+  app.innerHTML = '<div class="soft-card p-10 text-center text-gray-500">Carregando seus números…</div>';
+  const pessoa = ABAS.find(a=>a.tab===tab) || ABAS[0];
   try{
-    const table = await buscarAba(TAB);
-    const dados = parseMensal(table);
-    render(dados);
+    const table = await buscarAba(pessoa.tab);
+    const parsed = parseAbaIndividual(table);
+    const {valor:bonusApurado, erro:erroBonus} = await buscarBonusApurado(pessoa.nome);
+    render(pessoa, parsed, bonusApurado, erroBonus);
   }catch(e){
-    const dentroDeIframe = (function(){ try{ return window.self !== window.top; }catch(_){ return true; } })();
-    const dicaSandbox = dentroDeIframe
-      ? `<p class="mt-3 text-sm text-gray-600"><b>Isso é esperado dentro do preview do Claude:</b> por segurança, o Claude bloqueia chamadas de rede externas de dentro do artifact. Essa tela só vai puxar dados de verdade fora daqui — publicada (ex: GitHub Pages).</p>`
-      : '';
-    const urlBruta = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(TAB)}`;
+    const urlBruta = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(pessoa.tab)}`;
     app.innerHTML = `<div class="soft-card p-8 text-red-600">
-      Não consegui ler o Dashboard Mensal.<br><br>${e.message}
-      ${dicaSandbox}<br>
-      <a href="${urlBruta}" target="_blank" class="text-violet-600 font-bold underline">abrir resposta crua da planilha (aba ${TAB})</a>
+      Não consegui ler essa aba.<br><br>${e.message}<br><br>
+      <a href="${urlBruta}" target="_blank" class="text-violet-600 font-bold underline">abrir resposta crua da planilha</a>
       ${e.dump ? `<br><br><pre class="text-left whitespace-pre-wrap text-[10px] bg-gray-100 p-3 rounded-lg mt-2">${e.dump}</pre>` : ''}
     </div>`;
   }
 }
 
-carregar();
+carregar(localStorage.getItem('metas_pessoa') || '5_SDR');
 </script>
 </body>
 </html>
