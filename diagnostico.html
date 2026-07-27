@@ -113,11 +113,27 @@ const ABAS = [
 
 /* ============ PARSER (mesma lógica testada em Node) ============ */
 function norm(s){ return String(s??'').trim().toLowerCase(); }
+
+// Acha a coluna "Dia" dada uma lista de rótulos já normalizados (um por coluna).
+// Em algumas abas o rótulo de "Dia" vem colado a um texto de instrução enorme
+// (ex: "RAYANA — ACOMPANHAMENTO DIÁRIO ... Dia"), então a comparação exata
+// falha. Nesse caso, ancoramos pela coluna "Data" (que é sempre um rótulo
+// limpo) e assumimos que "Dia" é a coluna imediatamente à esquerda dela —
+// é assim que essa planilha é montada.
+function acharColDia(labelsNorm){
+  const exata = labelsNorm.findIndex(l => l === 'dia');
+  if (exata >= 0) return exata;
+  const idxData = labelsNorm.findIndex(l => l === 'data');
+  if (idxData > 0) return idxData - 1;
+  return -1;
+}
+
 function parseAbaIndividual(table){
   const rows = table.rows, C = table.cols.length;
   const cell=(r,c)=>(rows[r]&&rows[r].c[c])?rows[r].c[c]:null;
   const val=(r,c)=>{const x=cell(r,c);return x?(x.f??x.v??''):''};
   const rawnum=(r,c)=>{const x=cell(r,c);if(!x)return null;const n=typeof x.v==='number'?x.v:parseFloat(String(x.v).replace(',','.'));return isNaN(n)?null:n};
+
   // O Google às vezes detecta sozinho a 1ª linha como cabeçalho e já tira ela
   // de "rows" (o texto vira table.cols[].label); outras vezes não detecta e
   // o cabeçalho continua sendo a 1ª linha normal dentro de "rows". Cobrimos
@@ -125,18 +141,22 @@ function parseAbaIndividual(table){
   let colDia=-1, dataStartRow=0;
   const headerMap={};
   const colLabelsNorm = table.cols.map(c => norm(c.label));
-  const idxDiaNoLabel = colLabelsNorm.findIndex(l => l==='dia');
+  colDia = acharColDia(colLabelsNorm);
 
-  if(idxDiaNoLabel >= 0){
+  if(colDia >= 0){
     // Caso 1: cabeçalho já veio como rótulo de coluna — dados começam em rows[0]
-    colDia = idxDiaNoLabel;
     for(let c=colDia;c<C;c++){ if(colLabelsNorm[c]) headerMap[colLabelsNorm[c]]=c; }
     dataStartRow = 0;
   } else {
-    // Caso 2: cabeçalho é uma linha normal dentro de "rows" — procura o texto "Dia"
+    // Caso 2: cabeçalho é uma linha normal dentro de "rows"
     let headerRow=-1;
     const limiteBusca = Math.min(rows.length,30);
-    for(let r=0;r<limiteBusca;r++){for(let c=0;c<C;c++){if(norm(val(r,c))==='dia'){headerRow=r;colDia=c;break}}if(headerRow>=0)break}
+    for(let r=0;r<limiteBusca;r++){
+      const labelsDaLinha = [];
+      for(let c=0;c<C;c++) labelsDaLinha.push(norm(val(r,c)));
+      const candidato = acharColDia(labelsDaLinha);
+      if(candidato>=0){ headerRow=r; colDia=candidato; break; }
+    }
     if(headerRow<0){
       // não achou de nenhum jeito — monta um dump das primeiras linhas E dos
       // rótulos de coluna crus, pra diagnosticar sem precisar de mais uma rodada
@@ -150,7 +170,7 @@ function parseAbaIndividual(table){
         for(let c=0;c<Math.min(C,10);c++) linha.push(val(r,c) || '·');
         dump.push(`L${r}: ${linha.join(' | ')}`);
       }
-      const err = new Error('Cabeçalho "Dia" não encontrado nessa aba (nem nos títulos das colunas, nem no conteúdo)');
+      const err = new Error('Cabeçalho "Dia"/"Data" não encontrado nessa aba (nem nos títulos das colunas, nem no conteúdo)');
       err.dump = dump.join('\n');
       throw err;
     }
@@ -168,11 +188,22 @@ function parseAbaIndividual(table){
       faltou:colFaltou!=null?(norm(val(r,colFaltou))==='sim'||norm(val(r,colFaltou))==='x'):false,
       metaDia:colMetaDia!=null?rawnum(r,colMetaDia):null});
   }
-  let resumoRow=-1,resumoCol=-1;
-  for(let r=0;r<rows.length;r++){for(let c=0;c<C;c++){if(norm(val(r,c)).includes('resumo do mês')){resumoRow=r;resumoCol=c;break}}if(resumoRow>=0)break}
-  if(resumoRow<0) throw new Error('Bloco "RESUMO DO MÊS" não encontrado nessa aba');
+
+  // Bloco "RESUMO DO MÊS": mesmo problema pode acontecer aqui — o rótulo pode
+  // já ter virado table.cols[].label em vez de aparecer dentro de "rows".
+  let resumoCol=-1, resumoDataStart=0;
+  const idxResumoLabel = table.cols.findIndex(c => norm(c.label).includes('resumo do mês'));
+  if(idxResumoLabel >= 0){
+    resumoCol = idxResumoLabel;
+    resumoDataStart = 0;
+  } else {
+    let resumoRow=-1;
+    for(let r=0;r<rows.length;r++){for(let c=0;c<C;c++){if(norm(val(r,c)).includes('resumo do mês')){resumoRow=r;resumoCol=c;break}}if(resumoRow>=0)break}
+    if(resumoRow<0) throw new Error('Bloco "RESUMO DO MÊS" não encontrado nessa aba (nem nos títulos das colunas, nem no conteúdo)');
+    resumoDataStart = resumoRow+1;
+  }
   const resumo={semanas:{}}; let mensagem='';
-  for(let r=resumoRow+1;r<rows.length;r++){
+  for(let r=resumoDataStart;r<rows.length;r++){
     const label=norm(val(r,resumoCol)); const valor=val(r,resumoCol+1); const valor2=val(r,resumoCol+2);
     if(!label) continue;
     if(label==='meta mensal') resumo.metaMensal=rawnum(r,resumoCol+1);
