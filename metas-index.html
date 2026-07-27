@@ -209,18 +209,31 @@ async function buscarBonusApurado(nomePessoa){
 
     const headerMap={};
     let dataStartRow=0;
+    /* mescla as duas fontes sempre: cols[].label (parece que colunas
+       NUMÉRICAS mantêm o rótulo limpo aqui mesmo sem "promoção" completa)
+       e a própria linha onde achamos "Pessoa" (colunas de TEXTO, tipo
+       Status/Mensagem, parecem manter o rótulo só na linha). */
+    for(let c=0;c<C;c++){ if(colLabelsNorm[c]) headerMap[colLabelsNorm[c]]=c; }
     if(headerRow>=0){
-      for(let c=colPessoa;c<C;c++){const t=norm(val(headerRow,c));if(t)headerMap[t]=c}
+      for(let c=0;c<C;c++){ const t=norm(val(headerRow,c)); if(t) headerMap[t]=c; }
       dataStartRow=headerRow+1;
-    }else{
-      for(let c=0;c<C;c++){ if(colLabelsNorm[c]) headerMap[colLabelsNorm[c]]=c; }
     }
     let colBonusApurado = headerMap['bônus apurado'];
     if(colBonusApurado==null){
       const k = Object.keys(headerMap).find(k=>k.includes('bônus')&&k.includes('apurado'));
       if(k) colBonusApurado = headerMap[k];
     }
-    if(colBonusApurado==null) return {valor:null, erro:'coluna "Bônus apurado" não encontrada. Colunas vistas: '+Object.keys(headerMap).join(' | ')};
+    if(colBonusApurado==null){
+      const dump=[];
+      dump.push('--- table.cols ---');
+      table.cols.forEach((c,i)=>dump.push(`col ${i}: label=${JSON.stringify(c.label)} type=${c.type}`));
+      dump.push('--- primeiras linhas ---');
+      for(let r=0;r<Math.min(rows.length,10);r++){
+        const linha=[]; for(let c=0;c<Math.min(C,14);c++) linha.push(val(r,c)||'·');
+        dump.push(`L${r}: ${linha.join(' | ')}`);
+      }
+      return {valor:null, erro:'coluna "Bônus apurado" não encontrada. Colunas vistas: '+Object.keys(headerMap).join(' | '), dump:dump.join('\n')};
+    }
     for(let r=dataStartRow;r<rows.length;r++){
       const nome = val(r,colPessoa);
       if(nome===''||nome==null) break;
@@ -287,7 +300,7 @@ const ICONE_CADEADO = `<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 
 const ICONE_X = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" stroke-linecap="round" stroke-linejoin="round" stroke-width="3"/></svg>`;
 
 /* ================= RENDER ================= */
-function render(pessoa, parsed, bonusApurado, erroBonus){
+function render(pessoa, parsed, bonusApurado, erroBonus, dumpBonus){
   const {dias, resumo} = parsed;
   const st = statusDe(resumo.mensagem);
   const pctNum = resumo.metaMensal ? resumo.realizadoTotal/resumo.metaMensal : 0;
@@ -416,6 +429,7 @@ function render(pessoa, parsed, bonusApurado, erroBonus){
         <p class="text-3xl font-extrabold text-gray-900 mt-1">${bonusApurado ?? '—'}</p>
         <p class="text-[11px] text-gray-400 mt-1">já garantido (líquido de falta)</p>
         ${erroBonus?`<p class="text-[9px] text-red-400 mt-1">debug: ${String(erroBonus).replace(/</g,'&lt;')}</p>`:''}
+        ${dumpBonus?`<pre class="text-left whitespace-pre-wrap text-[9px] bg-gray-100 p-2 rounded-lg mt-2">${String(dumpBonus).replace(/</g,'&lt;')}</pre>`:''}
       </div>
       <div class="soft-card p-6 flex flex-col items-center justify-center">
         <h3 class="text-gray-700 font-bold text-lg mb-1">Dias Restantes</h3>
@@ -474,8 +488,8 @@ async function carregar(tab){
   try{
     const table = await buscarAba(pessoa.tab);
     const parsed = parseAbaIndividual(table);
-    const {valor:bonusApurado, erro:erroBonus} = await buscarBonusApurado(pessoa.nome);
-    render(pessoa, parsed, bonusApurado, erroBonus);
+    const {valor:bonusApurado, erro:erroBonus, dump:dumpBonus} = await buscarBonusApurado(pessoa.nome);
+    render(pessoa, parsed, bonusApurado, erroBonus, dumpBonus);
   }catch(e){
     const urlBruta = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(pessoa.tab)}`;
     app.innerHTML = `<div class="soft-card p-8 text-red-600">
