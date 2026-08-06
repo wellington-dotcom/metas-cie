@@ -616,22 +616,51 @@ async function carregarListaPessoas(){
     }
     if(headerRow<0){ DEBUG_LISTA = 'não achei o cabeçalho "Métrica primária" na aba de config'; return; }
 
-    // nome = 2 colunas antes de "Métrica primária"; função = 1 antes.
-    const colNome = colMetrica-2, colFuncao = colMetrica-1;
+    // Em vez de assumir "nome = 2 colunas antes", DESCOBRIMOS a coluna de
+    // função: aquela, à esquerda de "Métrica primária", cujos valores logo
+    // abaixo do cabeçalho casam com uma função conhecida (Marketing, SDR...).
+    // O nome é a coluna imediatamente à esquerda da função.
+    let colFuncao=-1;
+    for(let c=colMetrica-1;c>=0;c--){
+      let acertos=0;
+      for(let r=headerRow+1;r<Math.min(rows.length,headerRow+12);r++){
+        const f = norm(val(r,c));
+        if(f && FUNCAO_PARA_ABA[f]) acertos++;
+      }
+      if(acertos>=2){ colFuncao=c; break; }   // achou a coluna de função
+    }
+
+    // fallback: se não achou por conteúdo, volta pra regra antiga (2 antes)
+    let colNome;
+    if(colFuncao>=0){ colNome = colFuncao-1; }
+    else { colFuncao = colMetrica-1; colNome = colMetrica-2; }
     if(colNome<0){ DEBUG_LISTA = 'estrutura inesperada (colNome negativa)'; return; }
 
     const lista = [];
+    let vistos = 0;
     for(let r=headerRow+1;r<rows.length;r++){
       const nome = String(val(r,colNome)).trim();
-      if(!nome) break;                          // linha em branco -> fim da tabela
-      if(norm(nome)==='total') break;           // linha TOTAL -> fim
-      const funcao = norm(val(r,colFuncao));
-      const tab = FUNCAO_PARA_ABA[funcao];
-      if(!tab){ DEBUG_LISTA += `[função "${funcao}" (de ${nome}) não mapeada] `; continue; }
+      const funcaoTxt = norm(val(r,colFuncao));
+      // fim da tabela: linha sem nome E sem função, ou linha TOTAL
+      if(!nome && !funcaoTxt) break;
+      if(norm(nome)==='total') break;
+      vistos++;
+      if(!nome) continue;
+      const tab = FUNCAO_PARA_ABA[funcaoTxt];
+      if(!tab){ DEBUG_LISTA += `[${nome}: função "${funcaoTxt}" não mapeada] `; continue; }
       lista.push({tab, nome});
     }
     if(lista.length){ ABAS = lista; DEBUG_LISTA = 'ok: '+lista.map(a=>a.nome).join(', '); }
-    else DEBUG_LISTA = 'tabela achada mas nenhuma pessoa lida';
+    else {
+      // dump pra diagnóstico: mostra as células ao redor do cabeçalho
+      let dump = `tabela achada (cabeçalho na linha ${headerRow}, colMetrica=${colMetrica}, colNome=${colNome}, colFuncao=${colFuncao}, ${vistos} linhas vistas). Amostra: `;
+      for(let r=headerRow+1;r<Math.min(rows.length,headerRow+4);r++){
+        const cels=[];
+        for(let c=0;c<Math.min(C,6);c++) cels.push(`c${c}="${val(r,c)}"`);
+        dump += `L${r}[${cels.join(',')}] `;
+      }
+      DEBUG_LISTA = dump;
+    }
   }catch(e){
     DEBUG_LISTA = 'exceção ao ler lista: '+e.message;
   }
