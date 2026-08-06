@@ -257,11 +257,21 @@ async function buscarBonusApurado(nomePessoa){
     if(colPessoa<0) return {valor:null, erro:'coluna "Pessoa" não encontrada de nenhuma forma (exata ou aproximada)'};
 
     const colBonusApurado = colPessoa+7;
+    // No Dashboard Mensal alguns nomes vêm agrupados (ex: "Rayana e Ana Lívia",
+    // e "Isadora Brito" pra quem no individual é "Haniely"/"Nauane"). Então
+    // casamos de forma flexível: 1º tenta igualdade exata; se não achar,
+    // tenta a linha cujo nome CONTÉM o primeiro nome da pessoa.
+    const alvo = norm(nomePessoa);
+    const primeiroNome = alvo.split(' ')[0];
+    let linhaExata=-1, linhaContém=-1;
     for(let r=dataStartRow;r<rows.length;r++){
-      const nome = val(r,colPessoa);
+      const nome = norm(val(r,colPessoa));
       if(nome===''||nome==null) break;
-      if(norm(nome)===norm(nomePessoa)) return {valor: val(r,colBonusApurado), erro:null};
+      if(nome===alvo){ linhaExata=r; break; }
+      if(linhaContém<0 && (nome.includes(primeiroNome) || primeiroNome.includes(nome.split(' ')[0]))) linhaContém=r;
     }
+    const linha = linhaExata>=0 ? linhaExata : linhaContém;
+    if(linha>=0) return {valor: val(linha,colBonusApurado), erro:null};
     return {valor:null, erro:`pessoa "${nomePessoa}" não encontrada na coluna Pessoa`};
   }catch(e){ return {valor:null, erro:'exceção: '+e.message}; }
 }
@@ -311,16 +321,34 @@ function parseRealMeta(s){
   if(partes.length!==2 || isNaN(partes[0]) || isNaN(partes[1])) return null;
   return {real:partes[0], meta:partes[1]};
 }
-/* acha o dia de "hoje" comparando a data real do calendário com as datas da
-   planilha — não pode assumir que a última linha é hoje, porque a planilha
-   já vem preenchida (com zero) até o fim do mês inteiro. */
-function acharHoje(dias, agora){
+/* Descobre em que "estado" o mês da planilha está, comparando as datas da
+   planilha com a data real de hoje:
+   - 'corrente': hoje cai dentro do intervalo de datas da planilha
+   - 'encerrado': hoje já passou do último dia da planilha (virou o mês)
+   - 'futuro': hoje ainda é antes do primeiro dia da planilha
+   Isso conserta o bug de ficar "preso" no dia 31: antes, quando o mês virava,
+   nenhuma data batia e o código assumia que o último dia era "hoje". */
+function estadoDoMes(dias, agora){
   agora = agora || new Date();
-  const achado = dias.find(d=>{
+  const hojeZero = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate());
+  const datas = dias.map(d=>parseDataBR(d.data)).filter(Boolean);
+  if(!datas.length) return {estado:'corrente', hoje:dias[dias.length-1]||null};
+  const primeiro = datas[0], ultimo = datas[datas.length-1];
+
+  if(hojeZero > ultimo){
+    // mês encerrado — "hoje" conceitual é o último dia (pra fins de exibição),
+    // mas marcamos o estado como encerrado pra fechar todas as semanas.
+    return {estado:'encerrado', hoje:dias[dias.length-1]||null};
+  }
+  if(hojeZero < primeiro){
+    return {estado:'futuro', hoje:null};
+  }
+  // corrente: acha a linha cuja data é exatamente hoje
+  const hoje = dias.find(d=>{
     const dt = parseDataBR(d.data);
-    return dt && dt.getDate()===agora.getDate() && dt.getMonth()===agora.getMonth() && dt.getFullYear()===agora.getFullYear();
-  });
-  return achado || dias[dias.length-1] || null;
+    return dt && dt.getTime()===hojeZero.getTime();
+  }) || dias[dias.length-1] || null;
+  return {estado:'corrente', hoje};
 }
 
 function svgRing(pct, corHex, size=64, stroke=6){
@@ -348,13 +376,18 @@ function render(pessoa, parsed, bonusApurado, erroBonus){
   const pctNum = resumo.metaMensal ? resumo.realizadoTotal/resumo.metaMensal : 0;
   const pctLabel = resumo.pctAtingido || Math.round(pctNum*100)+'%';
 
-  const hoje = acharHoje(dias);
+  const { estado: estadoMes, hoje } = estadoDoMes(dias);
   const hojeData = hoje ? parseDataBR(hoje.data) : null;
   const totalDiasMes = hojeData ? diasNoMes(hojeData) : null;
-  const diasRestantes = (hoje && totalDiasMes) ? Math.max(0, totalDiasMes - hoje.dia) : null;
-  const pctMesDecorrido = (hoje && totalDiasMes) ? hoje.dia/totalDiasMes : 0;
+  // dias restantes: 0 se o mês já encerrou; senão, quanto falta pro fim do mês
+  const diasRestantes = estadoMes==='encerrado' ? 0
+    : (hoje && totalDiasMes) ? Math.max(0, totalDiasMes - hoje.dia) : null;
+  const pctMesDecorrido = estadoMes==='encerrado' ? 1
+    : (hoje && totalDiasMes) ? hoje.dia/totalDiasMes : 0;
 
-  const semanaAtualNum = hoje ? hoje.semana : null;
+  // qual semana está ativa. Se o mês encerrou, não há semana "atual" —
+  // todas viram concluídas. Se está no futuro, nenhuma começou ainda.
+  const semanaAtualNum = estadoMes==='corrente' && hoje ? hoje.semana : (estadoMes==='encerrado' ? 999 : 0);
 
   // Jornada do bônus: status de cada semana (concluída batendo / concluída sem bater / em andamento / travada)
   const semanasOrdenadas = ['1','2','3','4','5'].filter(n=>resumo.semanas[n]);
@@ -401,7 +434,7 @@ function render(pessoa, parsed, bonusApurado, erroBonus){
         <div class="bg-gray-400 text-white rounded-full w-8 h-8 flex items-center justify-center mx-auto mb-3">${ICONE_CADEADO}</div>
         <p class="text-xl font-bold text-gray-700">${s.bonus}</p>
         <hr class="border-gray-300 my-2"/>
-        <p class="text-[10px]">alvo da semana</p>
+        <p class="text-[10px] font-medium">${s.realMeta||'—'} Meta</p>
       </div>
     </div>`;
   }).join('');
