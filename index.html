@@ -572,7 +572,7 @@ function render(pessoa, parsed, bonusApurado, erroBonus){
       </div>
     </div>
 
-    <div class="text-center text-xs text-gray-400 pb-4">Dados direto da planilha · pode levar alguns minutos pra atualizar</div>
+    <div class="text-center text-xs text-gray-400 pb-4">Dados direto da planilha · pode levar alguns minutos pra atualizar${(DEBUG_LISTA && !DEBUG_LISTA.startsWith('ok'))?`<br><span class="text-amber-500">⚠️ nomes vieram da lista reserva — ${String(DEBUG_LISTA).replace(/</g,'&lt;')}</span>`:''}</div>
   `;
 
   document.getElementById('seletor').addEventListener('change', e=>{
@@ -588,42 +588,52 @@ function render(pessoa, parsed, bonusApurado, erroBonus){
    Ancora no cabeçalho "Métrica primária" pra achar a tabela mesmo que
    linhas sejam inseridas/removidas acima. Para na linha "TOTAL" ou numa
    linha em branco. Se algo der errado, mantém a lista de fallback. */
+let DEBUG_LISTA = ''; // guarda o que aconteceu na leitura da lista (pra diagnóstico)
 async function carregarListaPessoas(){
+  // tenta variações do nome da aba de config (por via das dúvidas com acento)
+  const tentativas = ['1_Configuração','1_Configuracao','1_Configuração '.trim()];
+  let table=null, ultimoErro='';
+  for(const nomeAba of tentativas){
+    try{ table = await buscarAba(nomeAba); if(table) break; }
+    catch(e){ ultimoErro = e.message; }
+  }
+  if(!table){ DEBUG_LISTA = 'não consegui abrir a aba de configuração: '+ultimoErro; return; }
+
   try{
-    const table = await buscarAba('1_Configuração');
     const rows = table.rows, C = table.cols.length;
     const val=(r,c)=>{const x=rows[r]&&rows[r].c[c]?rows[r].c[c]:null;return x?(x.f??x.v??''):''};
 
     // acha a linha do cabeçalho: a que tem "métrica primária" em alguma coluna
     let headerRow=-1, colMetrica=-1;
-    for(let r=0;r<Math.min(rows.length,80);r++){
+    for(let r=0;r<Math.min(rows.length,120);r++){
       for(let c=0;c<C;c++){
-        if(norm(val(r,c)).includes('métrica primária') || norm(val(r,c)).includes('metrica primaria')){
+        const t = norm(val(r,c));
+        if(t.includes('métrica primária') || t.includes('metrica primaria')){
           headerRow=r; colMetrica=c; break;
         }
       }
       if(headerRow>=0) break;
     }
-    if(headerRow<0) return; // não achou -> mantém fallback
+    if(headerRow<0){ DEBUG_LISTA = 'não achei o cabeçalho "Métrica primária" na aba de config'; return; }
 
-    // nome = 1ª coluna do cabeçalho ("Pessoa"); função = 2ª coluna ("Pessoa"/função)
-    // pela estrutura: nome está 2 colunas antes de "Métrica primária", função 1 antes
+    // nome = 2 colunas antes de "Métrica primária"; função = 1 antes.
     const colNome = colMetrica-2, colFuncao = colMetrica-1;
-    if(colNome<0) return;
+    if(colNome<0){ DEBUG_LISTA = 'estrutura inesperada (colNome negativa)'; return; }
 
     const lista = [];
     for(let r=headerRow+1;r<rows.length;r++){
       const nome = String(val(r,colNome)).trim();
-      if(!nome) break;                          // linha em branco -> fim
+      if(!nome) break;                          // linha em branco -> fim da tabela
       if(norm(nome)==='total') break;           // linha TOTAL -> fim
       const funcao = norm(val(r,colFuncao));
       const tab = FUNCAO_PARA_ABA[funcao];
-      if(!tab) continue;                         // função desconhecida -> pula
+      if(!tab){ DEBUG_LISTA += `[função "${funcao}" (de ${nome}) não mapeada] `; continue; }
       lista.push({tab, nome});
     }
-    if(lista.length) ABAS = lista;              // só troca se leu pelo menos 1
+    if(lista.length){ ABAS = lista; DEBUG_LISTA = 'ok: '+lista.map(a=>a.nome).join(', '); }
+    else DEBUG_LISTA = 'tabela achada mas nenhuma pessoa lida';
   }catch(e){
-    // falhou (rede, formato...) -> mantém ABAS_FALLBACK, sem quebrar a tela
+    DEBUG_LISTA = 'exceção ao ler lista: '+e.message;
   }
 }
 
