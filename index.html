@@ -236,6 +236,39 @@ function parseAbaIndividual(table){
     else if(!valor && label.length>15 && !mensagem) mensagem=val(r,resumoCol);
   }
   resumo.mensagem=mensagem;
+
+  /* Indicadores extras que só algumas abas têm (ex: Isadora/6_Closer):
+     blocos "METAS DE EFICIÊNCIA" e "FATURAMENTO AGREGADO". Buscamos cada
+     rótulo pelo texto e pegamos o valor da célula à direita — se a aba não
+     tiver esses blocos, simplesmente fica null e não aparece na tela. */
+  function valorPorRotulo(alvo){
+    const a = norm(alvo);
+    for(let r=0;r<rows.length;r++){
+      for(let c=0;c<C;c++){
+        if(norm(val(r,c))===a){
+          // valor é a 1ª célula não-vazia à direita, na mesma linha
+          for(let c2=c+1;c2<C;c2++){ const v=val(r,c2); if(v!=='') return v; }
+        }
+      }
+    }
+    return null;
+  }
+  const extras = {
+    vendasFechadas:    valorPorRotulo('vendas fechadas'),
+    taxaConversao:     valorPorRotulo('taxa de conversão'),
+    metaConversao:     valorPorRotulo('meta taxa de conversão'),
+    statusConversao:   valorPorRotulo('status conversão'),
+    faturamentoAgreg:  valorPorRotulo('faturamento agregado'),
+    metaFaturamento:   valorPorRotulo('meta (85% do faturamento)'),
+    statusFaturamento: valorPorRotulo('status faturamento'),
+  };
+  // só considera "tem extras" se pelo menos o faturamento agregado existir
+  extras.tem = extras.faturamentoAgreg!=null || extras.taxaConversao!=null;
+  resumo.extras = extras;
+  // propostas do mês = realizado total; vendas = vendas fechadas
+  resumo.propostasMes = resumo.realizadoTotal;
+  resumo.vendasMes = extras.vendasFechadas;
+
   return {dias,resumo};
 }
 async function buscarAba(tab){
@@ -541,6 +574,30 @@ function render(pessoa, parsed, bonusApurado, erroBonus){
         </div>
       </div>
     </div>
+
+    ${resumo.extras && resumo.extras.tem ? `
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div class="soft-card p-6">
+        <p class="text-[11px] font-bold text-gray-400 uppercase tracking-wide mb-2">Faturamento agregado</p>
+        <p class="text-2xl font-black text-gray-900">${resumo.extras.faturamentoAgreg ?? '—'}</p>
+        <p class="text-xs text-gray-500 mt-1">meta ${resumo.extras.metaFaturamento ?? '—'} · ${resumo.extras.statusFaturamento ?? ''}</p>
+      </div>
+      <div class="soft-card p-6">
+        <p class="text-[11px] font-bold text-gray-400 uppercase tracking-wide mb-2">Taxa de conversão</p>
+        <p class="text-2xl font-black text-gray-900">${resumo.extras.taxaConversao ?? '—'}</p>
+        <p class="text-xs text-gray-500 mt-1">meta ${resumo.extras.metaConversao ?? '—'} · ${resumo.extras.statusConversao ?? ''}</p>
+      </div>
+      <div class="soft-card p-6">
+        <p class="text-[11px] font-bold text-gray-400 uppercase tracking-wide mb-2">Propostas feitas</p>
+        <p class="text-2xl font-black text-violet-600">${resumo.propostasMes ?? '—'}</p>
+        <p class="text-xs text-gray-500 mt-1">no mês</p>
+      </div>
+      <div class="soft-card p-6">
+        <p class="text-[11px] font-bold text-gray-400 uppercase tracking-wide mb-2">Vendas feitas</p>
+        <p class="text-2xl font-black text-violet-600">${resumo.vendasMes ?? '—'}</p>
+        <p class="text-xs text-gray-500 mt-1">no mês</p>
+      </div>
+    </div>` : ''}
 
     <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
       <div class="lg:col-span-1 soft-card p-8 flex flex-col items-center justify-center text-center">
