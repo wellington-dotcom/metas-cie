@@ -56,9 +56,14 @@ const FUNCAO_PARA_ABA = {
   'suporte': '09_Suporte',
 };
 
-/* Quando duas pessoas têm a MESMA função (ex.: duas Auxiliares), cada uma tem
-   a sua própria aba na planilha. Este mapa por NOME tem prioridade sobre o
-   mapa por função. Chave = nome em minúsculas, como aparece na 1_Configuração. */
+/* ORDEM DE PRIORIDADE pra descobrir a aba de cada pessoa:
+   1º coluna "Aba" da tabela "Metas Calculadas por Pessoa" (1_Configuração) —
+      é a fonte de verdade: trocou pessoa ou renomeou aba? Só edita essa célula.
+   2º mapa por NOME abaixo (reserva, caso a coluna "Aba" esteja vazia).
+   3º mapa por FUNÇÃO acima (reserva final).
+   Quando duas pessoas têm a MESMA função (ex.: duas Auxiliares), cada uma tem
+   a sua própria aba na planilha. Chave = nome em minúsculas, como aparece na
+   1_Configuração. */
 const PESSOA_PARA_ABA = {
   'isadora brito': '9_Haniely',
 };
@@ -700,6 +705,19 @@ async function carregarListaPessoas(){
     else { colFuncao = colMetrica-1; colNome = colMetrica-2; }
     if(colNome<0){ DEBUG_LISTA = 'estrutura inesperada (colNome negativa)'; return; }
 
+    // coluna "Aba" (opcional): procura na linha do cabeçalho; se o Google tiver
+    // promovido o cabeçalho pro rótulo da coluna, procura no rótulo também
+    let colAba=-1;
+    for(let c=0;c<C;c++){
+      if(norm(val(headerRow,c))==='aba'){ colAba=c; break; }
+    }
+    if(colAba<0){
+      for(let c=0;c<C;c++){
+        const lb = norm(table.cols[c] && table.cols[c].label);
+        if(lb==='aba' || lb.endsWith(' aba')){ colAba=c; break; }
+      }
+    }
+
     const lista = [];
     let vistos = 0;
     for(let r=headerRow+1;r<rows.length;r++){
@@ -710,11 +728,12 @@ async function carregarListaPessoas(){
       if(norm(nome)==='total') break;
       vistos++;
       if(!nome) continue;
-      const tab = PESSOA_PARA_ABA[norm(nome)] || FUNCAO_PARA_ABA[funcaoTxt];
+      const abaPlanilha = colAba>=0 ? String(val(r,colAba)).trim() : '';
+      const tab = abaPlanilha || PESSOA_PARA_ABA[norm(nome)] || FUNCAO_PARA_ABA[funcaoTxt];
       if(!tab){ DEBUG_LISTA += `[${nome}: função "${funcaoTxt}" não mapeada] `; continue; }
       lista.push({tab, nome});
     }
-    if(lista.length){ ABAS = lista; DEBUG_LISTA = 'ok: '+lista.map(a=>a.nome).join(', '); }
+    if(lista.length){ ABAS = lista; DEBUG_LISTA = 'ok'+(colAba>=0?' (coluna Aba)':' (sem coluna Aba — usando mapas do código)')+': '+lista.map(a=>a.nome+'→'+a.tab).join(', '); }
     else {
       // dump pra diagnóstico: mostra as células ao redor do cabeçalho
       let dump = `tabela achada (cabeçalho na linha ${headerRow}, colMetrica=${colMetrica}, colNome=${colNome}, colFuncao=${colFuncao}, ${vistos} linhas vistas). Amostra: `;
