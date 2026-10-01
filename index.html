@@ -56,6 +56,13 @@ const FUNCAO_PARA_ABA = {
   'suporte': '09_Suporte',
 };
 
+/* Quando duas pessoas têm a MESMA função (ex.: duas Auxiliares), cada uma tem
+   a sua própria aba na planilha. Este mapa por NOME tem prioridade sobre o
+   mapa por função. Chave = nome em minúsculas, como aparece na 1_Configuração. */
+const PESSOA_PARA_ABA = {
+  'isadora brito': '9_Haniely',
+};
+
 /* Lista de reserva — usada só se a leitura dos nomes da 1_Configuração falhar,
    pra tela nunca ficar vazia. Os nomes aqui podem ficar desatualizados; a
    fonte de verdade é a planilha. */
@@ -65,7 +72,7 @@ const ABAS_FALLBACK = [
   {tab:'6_Closer', nome:'Isadora'},
   {tab:'7_Recepção', nome:'Ludimila'},
   {tab:'8_Auxiliar', nome:'Nauane'},
-  {tab:'8_Auxiliar', nome:'Isadora Brito'},
+  {tab:'9_Haniely', nome:'Isadora Brito'},
   {tab:'09_Suporte', nome:'Tereza'},
 ];
 
@@ -703,7 +710,7 @@ async function carregarListaPessoas(){
       if(norm(nome)==='total') break;
       vistos++;
       if(!nome) continue;
-      const tab = FUNCAO_PARA_ABA[funcaoTxt];
+      const tab = PESSOA_PARA_ABA[norm(nome)] || FUNCAO_PARA_ABA[funcaoTxt];
       if(!tab){ DEBUG_LISTA += `[${nome}: função "${funcaoTxt}" não mapeada] `; continue; }
       lista.push({tab, nome});
     }
